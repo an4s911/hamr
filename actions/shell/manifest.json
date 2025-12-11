@@ -1,0 +1,22 @@
+{
+  "name": "Shell Commands",
+  "description": "Search and execute shell history commands",
+  "icon": "terminal",
+  "version": "1.0",
+  
+  "steps": {
+    "initial": {
+      "prompt": "Search shell history...",
+      "type": "search",
+      "fuzzy": true
+    },
+    "selected": {
+      "type": "actions"
+    }
+  },
+  
+  "config": {
+    "persistent": false,
+    "timeout": 5000
+  }
+}

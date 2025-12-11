@@ -1,0 +1,14 @@
+#!/bin/bash
+# Switch to light mode
+# Customize this script for your setup
+
+# GNOME/GTK (uncomment if using GNOME)
+# gsettings set org.gnome.desktop.interface color-scheme prefer-light
+
+# For end-4 dotfiles users with switchwall.sh
+SCRIPT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/ii/scripts/colors"
+if [[ -x "$SCRIPT_DIR/switchwall.sh" ]]; then
+    "$SCRIPT_DIR/switchwall.sh" --mode light --noswitch
+else
+    notify-send "Light mode" "switchwall.sh not found - customize this script for your setup"
+fi

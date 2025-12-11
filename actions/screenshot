@@ -1,0 +1,3 @@
+#!/bin/bash
+# Take screenshot with satty
+grim -g "$(slurp)" - | satty -f -

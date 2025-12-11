@@ -1,0 +1,430 @@
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import qs
+import QtQuick
+import Qt.labs.folderlistmodel
+import Quickshell
+import Quickshell.Io
+import qs.modules.common
+import qs.modules.common.functions
+
+/**
+ * WorkflowRunner - Multi-step action workflow execution service
+ * 
+ * Manages bidirectional JSON communication with workflow handler scripts.
+ * Workflows are folders in ~/.config/hamr/actions/ containing:
+ *   - manifest.json: Workflow metadata and configuration
+ *   - handler.py: Executable script that processes JSON protocol
+ * 
+ * Protocol:
+ *   Input (stdin to script):
+ *     { "step": "initial|search|action", "query": "...", "selected": {...}, "action": "...", "session": "..." }
+ *   
+ *   Output (stdout from script):
+ *     { "type": "results|card|execute|prompt|error", ... }
+ */
+Singleton {
+    id: root
+
+    // ==================== ACTIVE WORKFLOW STATE ====================
+    property var activeWorkflow: null  // { id, path, manifest, session }
+    property var workflowResults: []   // Current results from workflow
+    property var workflowCard: null    // Card to display (title, content, markdown)
+    property string workflowPrompt: "" // Custom prompt text
+    property string workflowPlaceholder: "" // Custom placeholder text for search bar
+    property bool workflowBusy: false  // True while waiting for script response
+    property string workflowError: ""  // Last error message
+    property var lastSelectedItem: null // Last selected item (persisted across search calls)
+
+    // Signal when workflow produces results
+    signal resultsReady(var results)
+    signal cardReady(var card)
+    signal executeCommand(var command)
+    signal workflowClosed()
+    signal clearInputRequested()  // Signal to clear the search input
+    
+    // Signal when a trackable action is executed (has name field)
+    // Payload: { name, command, icon, thumbnail, workflowId, workflowName }
+    signal actionExecuted(var actionInfo)
+
+    // ==================== WORKFLOW DISCOVERY ====================
+    
+    // Loaded workflows from actions/ directory
+    // Each workflow: { id, path, manifest: { name, description, icon, ... } }
+    property var workflows: []
+    property var pendingManifestLoads: []
+    
+    // Load workflows when directory changes
+    function loadWorkflows() {
+        root.pendingManifestLoads = [];
+        
+        for (let i = 0; i < workflowsFolder.count; i++) {
+            const fileName = workflowsFolder.get(i, "fileName");
+            const filePath = workflowsFolder.get(i, "filePath");
+            if (fileName && filePath) {
+                const dirPath = filePath.toString().replace("file://", "");
+                root.pendingManifestLoads.push({
+                    id: fileName,
+                    path: dirPath
+                });
+            }
+        }
+        
+        root.workflows = [];
+        
+        if (root.pendingManifestLoads.length > 0) {
+            loadNextManifest();
+        }
+    }
+    
+    function loadNextManifest() {
+        if (root.pendingManifestLoads.length === 0) {
+            return;
+        }
+        
+        const workflow = root.pendingManifestLoads.shift();
+        manifestLoader.workflowId = workflow.id;
+        manifestLoader.workflowPath = workflow.path;
+        manifestLoader.command = ["cat", workflow.path + "/manifest.json"];
+        manifestLoader.running = true;
+    }
+    
+    Process {
+        id: manifestLoader
+        property string workflowId: ""
+        property string workflowPath: ""
+        property string outputBuffer: ""
+        
+        stdout: SplitParser {
+            splitMarker: ""
+            onRead: data => {
+                manifestLoader.outputBuffer += data;
+            }
+        }
+        
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0 && manifestLoader.outputBuffer.trim()) {
+                try {
+                    const manifest = JSON.parse(manifestLoader.outputBuffer.trim());
+                    manifest._handlerPath = manifestLoader.workflowPath + "/handler.py";
+                    
+                    const updated = root.workflows.slice();
+                    updated.push({
+                        id: manifestLoader.workflowId,
+                        path: manifestLoader.workflowPath,
+                        manifest: manifest
+                    });
+                    root.workflows = updated;
+                } catch (e) {
+                    console.warn(`[WorkflowRunner] Failed to parse manifest for ${manifestLoader.workflowId}:`, e);
+                }
+            }
+            
+            manifestLoader.outputBuffer = "";
+            root.loadNextManifest();
+        }
+    }
+    
+    // Watch for workflow folders
+    FolderListModel {
+        id: workflowsFolder
+        folder: `file://${Directories.userActions}`
+        showDirs: true
+        showFiles: false
+        showHidden: false
+        sortField: FolderListModel.Name
+        onCountChanged: root.loadWorkflows()
+        onStatusChanged: {
+            if (status === FolderListModel.Ready) {
+                root.loadWorkflows();
+            }
+        }
+    }
+    
+
+
+    // ==================== WORKFLOW EXECUTION ====================
+    
+    // Start a workflow
+    function startWorkflow(workflowId) {
+        const workflow = root.workflows.find(w => w.id === workflowId);
+        if (!workflow || !workflow.manifest) {
+            return false;
+        }
+        
+        const session = generateSessionId();
+        
+        root.activeWorkflow = {
+            id: workflow.id,
+            path: workflow.path,
+            manifest: workflow.manifest,
+            session: session
+        };
+        root.workflowResults = [];
+        root.workflowCard = null;
+        root.workflowPrompt = workflow.manifest.steps?.initial?.prompt ?? "";
+        root.workflowPlaceholder = "";  // Reset placeholder on workflow start
+        root.workflowError = "";
+        
+        sendToWorkflow({ step: "initial", session: session });
+        return true;
+    }
+    
+    // Send search query to active workflow
+    function search(query) {
+        if (!root.activeWorkflow) return;
+        
+        const input = {
+            step: "search",
+            query: query,
+            session: root.activeWorkflow.session
+        };
+        
+        // Include last selected item for context (useful for multi-step workflows)
+        if (root.lastSelectedItem) {
+            input.selected = { id: root.lastSelectedItem };
+        }
+        
+        sendToWorkflow(input);
+    }
+    
+    // Select an item and optionally execute an action
+    function selectItem(itemId, actionId) {
+        if (!root.activeWorkflow) return;
+        
+        // Store selection for context in subsequent search calls
+        root.lastSelectedItem = itemId;
+        
+        const input = {
+            step: "action",
+            selected: { id: itemId },
+            session: root.activeWorkflow.session
+        };
+        
+        if (actionId) {
+            input.action = actionId;
+        }
+        
+        sendToWorkflow(input);
+    }
+    
+    // Close active workflow
+    function closeWorkflow() {
+        root.activeWorkflow = null;
+        root.workflowResults = [];
+        root.workflowCard = null;
+        root.workflowPrompt = "";
+        root.workflowPlaceholder = "";
+        root.lastSelectedItem = null;
+        root.workflowError = "";
+        root.workflowBusy = false;
+        workflowProcess.running = false;
+        root.workflowClosed();
+    }
+    
+    // Check if a workflow is active
+    function isActive() {
+        return root.activeWorkflow !== null;
+    }
+    
+    // Get workflow by ID
+    function getWorkflow(id) {
+        return root.workflows.find(w => w.id === id) ?? null;
+    }
+    
+    // ==================== INTERNAL ====================
+    
+    function generateSessionId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    }
+    
+    function sendToWorkflow(input) {
+        if (!root.activeWorkflow) return;
+        
+        root.workflowBusy = true;
+        root.workflowError = "";
+        
+        const handlerPath = root.activeWorkflow.manifest._handlerPath 
+            ?? (root.activeWorkflow.path + "/handler.py");
+        
+        const inputJson = JSON.stringify(input);
+        
+        // Use bash to pipe input to python - avoids stdinEnabled issues
+        workflowProcess.running = false;
+        workflowProcess.workingDirectory = root.activeWorkflow.path;
+        const escapedInput = inputJson.replace(/'/g, "'\\''");
+        workflowProcess.command = ["bash", "-c", `echo '${escapedInput}' | python3 "${handlerPath}"`];
+        workflowProcess.running = true;
+    }
+    
+    function handleWorkflowResponse(response) {
+        root.workflowBusy = false;
+        
+        if (!response || !response.type) {
+            root.workflowError = "Invalid response from workflow";
+            return;
+        }
+        
+        // Update session if provided
+        if (response.session && root.activeWorkflow) {
+            root.activeWorkflow.session = response.session;
+        }
+        
+        switch (response.type) {
+            case "results":
+                root.workflowResults = response.results ?? [];
+                root.workflowCard = null;
+                if (response.placeholder !== undefined) {
+                    root.workflowPlaceholder = response.placeholder ?? "";
+                }
+                // Allow handler to set the context for subsequent search calls
+                if (response.context !== undefined) {
+                    root.lastSelectedItem = response.context;
+                }
+                if (response.clearInput) {
+                    root.clearInputRequested();
+                }
+root.resultsReady(root.workflowResults);
+                break;
+                
+            case "card":
+                root.workflowCard = response.card ?? null;
+                root.cardReady(root.workflowCard);
+                break;
+                
+            case "execute":
+                if (response.execute) {
+                    const exec = response.execute;
+                    if (exec.command) {
+                        Quickshell.execDetached(exec.command);
+                    }
+                    if (exec.notify) {
+                        Quickshell.execDetached(["notify-send", root.activeWorkflow?.manifest?.name ?? "Workflow", exec.notify, "-a", "Shell"]);
+                    }
+                    // If handler provides name, emit for history tracking
+                    if (exec.name) {
+                        root.actionExecuted({
+                            name: exec.name,
+                            command: exec.command ?? [],
+                            icon: exec.icon ?? root.activeWorkflow?.manifest?.icon ?? "play_arrow",
+                            thumbnail: exec.thumbnail ?? "",
+                            workflowId: root.activeWorkflow?.id ?? "",
+                            workflowName: root.activeWorkflow?.manifest?.name ?? ""
+                        });
+                    }
+                    if (exec.close) {
+                        root.executeCommand(exec);
+                    }
+                }
+                break;
+                
+            case "prompt":
+                if (response.prompt) {
+                    root.workflowPrompt = response.prompt.text ?? "";
+                    // preserve_input handled by caller
+                }
+                // Card might also be sent with prompt (for LLM responses)
+                if (response.card) {
+                    root.workflowCard = response.card;
+                    root.cardReady(root.workflowCard);
+                }
+                break;
+                
+            case "imageBrowser":
+                // Open image browser with workflow configuration
+                if (response.imageBrowser) {
+                    const config = {
+                        directory: response.imageBrowser.directory ?? "",
+                        title: response.imageBrowser.title ?? root.activeWorkflow?.manifest?.name ?? "Select Image",
+                        extensions: response.imageBrowser.extensions ?? null,
+                        actions: response.imageBrowser.actions ?? [],
+                        workflowId: root.activeWorkflow?.id ?? ""
+                    };
+                    GlobalStates.openImageBrowserForWorkflow(config);
+                }
+                break;
+                
+            case "error":
+                root.workflowError = response.message ?? "Unknown error";
+                console.warn(`[WorkflowRunner] Error: ${root.workflowError}`);
+                break;
+                
+            default:
+                console.warn(`[WorkflowRunner] Unknown response type: ${response.type}`);
+        }
+    }
+    
+    // Handle image browser selection - send back to workflow
+    Connections {
+        target: GlobalStates
+        function onImageBrowserSelected(filePath, actionId) {
+            if (!root.activeWorkflow) return;
+            
+            // Send selection back to workflow handler
+            sendToWorkflow({
+                step: "action",
+                selected: {
+                    id: "imageBrowser",
+                    path: filePath,
+                    action: actionId
+                },
+                session: root.activeWorkflow.session
+            });
+        }
+    }
+    
+    // Process for running workflow handler
+    Process {
+        id: workflowProcess
+        
+        stdout: StdioCollector {
+            id: workflowStdout
+            onStreamFinished: {
+                root.workflowBusy = false;
+                
+                const output = workflowStdout.text.trim();
+                if (!output) {
+                    root.workflowError = "No output from workflow";
+                    return;
+                }
+                
+                try {
+                    const response = JSON.parse(output);
+                    root.handleWorkflowResponse(response);
+                } catch (e) {
+                    root.workflowError = `Failed to parse workflow output: ${e}`;
+                    console.warn(`[WorkflowRunner] Parse error: ${e}, output: ${output}`);
+                }
+            }
+        }
+        
+        stderr: SplitParser {
+            onRead: data => console.warn(`[WorkflowRunner] stderr: ${data}`)
+        }
+        
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) {
+                root.workflowBusy = false;
+                root.workflowError = `Workflow exited with code ${exitCode}`;
+            }
+        }
+    }
+    
+    // Prepared workflows for fuzzy search
+    property var preppedWorkflows: workflows
+        .filter(w => w.manifest)
+        .map(w => ({
+            name: Fuzzy.prepare(w.id),
+            workflow: w
+        }))
+    
+    // Fuzzy search workflows by name
+    function fuzzyQueryWorkflows(query) {
+        if (!query || query.trim() === "") {
+            return root.workflows.filter(w => w.manifest);
+        }
+        return Fuzzy.go(query, root.preppedWorkflows, { key: "name", limit: 10 })
+            .map(r => r.obj.workflow);
+    }
+}
