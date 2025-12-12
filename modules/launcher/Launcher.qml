@@ -43,20 +43,16 @@ Scope {
                 right: true
             }
 
-            HyprlandFocusGrab {
-                id: grab
-                windows: [root]
-                property bool canBeActive: root.monitorIsFocused
-                active: false
-                onCleared: {
-                    // Re-grab focus if launcher should still be open.
-                    // Do not re-grab while the ImageBrowser overlay is open,
-                    // otherwise it can immediately get its grab cleared and close.
-                    if (GlobalStates.launcherOpen && canBeActive && !GlobalStates.imageBrowserOpen) {
-                        delayedGrabTimer.restart();
-                    }
-                }
-            }
+             HyprlandFocusGrab {
+                 id: grab
+                 windows: [root]
+                 property bool canBeActive: root.monitorIsFocused
+                 active: false
+                // Don't use onCleared to re-grab - it fires when other tools (screenshot
+                // region selectors, color pickers, etc.) take a pointer grab, and re-grabbing
+                // immediately steals focus back from them.
+             }
+
 
             Connections {
                 target: GlobalStates
@@ -117,6 +113,7 @@ Scope {
                     grab.active = GlobalStates.launcherOpen;
                 }
             }
+
 
             implicitWidth: columnLayout.implicitWidth
             implicitHeight: columnLayout.implicitHeight

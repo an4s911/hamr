@@ -271,9 +271,10 @@ Item { // Wrapper
                 color: Appearance.colors.colOutlineVariant
             }
 
-            // Loading indicator when workflow is processing
+            // Loading indicator when workflow is processing and no card is shown.
+            // For card-based workflows (chat), the card itself shows its busy state.
             RowLayout {
-                visible: WorkflowRunner.workflowBusy
+                visible: WorkflowRunner.workflowBusy && !root.showCard
                 Layout.fillWidth: true
                 Layout.margins: 20
                 spacing: 12
@@ -290,11 +291,36 @@ Item { // Wrapper
             }
 
             // Workflow card display (shown instead of results when card is present)
-            WorkflowCard {
-                id: workflowCard
-                visible: root.showCard && !WorkflowRunner.workflowBusy
+            // Use WorkflowRichCard when handler returns block-based cards (chat/timeline).
+            Loader {
+                id: workflowCardLoader
+                visible: root.showCard
                 Layout.fillWidth: true
-                card: WorkflowRunner.workflowCard
+
+                property var currentCard: WorkflowRunner.workflowCard
+
+                sourceComponent: {
+                    const c = workflowCardLoader.currentCard
+                    if (c === null || c === undefined) return null
+                    if ((c.kind ?? "") === "blocks" || c.blocks !== undefined) return richCardComponent
+                    return simpleCardComponent
+                }
+            }
+
+            Component {
+                id: richCardComponent
+                WorkflowRichCard {
+                    card: workflowCardLoader.currentCard
+                    busy: WorkflowRunner.workflowBusy
+                }
+            }
+
+            Component {
+                id: simpleCardComponent
+                WorkflowCard {
+                    card: workflowCardLoader.currentCard
+                    busy: WorkflowRunner.workflowBusy
+                }
             }
 
             ListView { // App results
@@ -340,7 +366,6 @@ Item { // Wrapper
 
                 delegate: SearchItem {
                     // The selectable item for each search result
-                    required property var modelData
                     anchors.left: parent?.left
                     anchors.right: parent?.right
                     entry: modelData

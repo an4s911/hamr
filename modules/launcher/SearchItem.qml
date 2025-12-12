@@ -13,7 +13,7 @@ import Quickshell.Hyprland
 
 RippleButton {
     id: root
-    property LauncherSearchResult entry
+    property var entry
     property string query
     property bool entryShown: entry?.shown ?? true
     property string itemType: entry?.type ?? "App"
@@ -152,15 +152,18 @@ RippleButton {
     onClicked: {
         // For workflow results, don't auto-close - let the handler decide via execute.close
         // For workflow entry (starting a workflow), keep open
-        // For everything else (apps, actions, etc.), close
+        // For everything else (apps, actions, scripts), close first to release HyprlandFocusGrab.
+        // This fixes region selectors like `slurp` (screenshot) not receiving pointer input.
         const isWorkflow = entry?.resultType === LauncherSearchResult.ResultType.WorkflowEntry ||
                           entry?.resultType === LauncherSearchResult.ResultType.WorkflowResult;
 
-        root.itemExecute()
-
-        if (!isWorkflow) {
-            GlobalStates.launcherOpen = false
+        if (isWorkflow) {
+            root.itemExecute()
+            return
         }
+
+        GlobalStates.launcherOpen = false
+        Qt.callLater(() => root.itemExecute())
     }
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier) {

@@ -19,6 +19,8 @@ import os
 import shutil
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 # Check if opencode is available
@@ -94,13 +96,10 @@ Make handler.py executable (chmod +x).
 Look at existing plugins in {actions_dir} for examples."""
 
 
-def chat_with_opencode(user_message: str, session: dict) -> tuple[bool, str]:
-    """
-    Send a message to OpenCode and get a response.
-    Uses --continue to maintain conversation context.
-    """
+def chat_with_opencode(user_message: str, session: dict) -> tuple[bool, dict]:
+    """Send a message to OpenCode and return a structured payload."""
+
     try:
-        # Build the conversation for opencode
         messages = session.get("messages", [])
 
         # First message includes system prompt
@@ -109,7 +108,6 @@ def chat_with_opencode(user_message: str, session: dict) -> tuple[bool, str]:
         else:
             full_prompt = user_message
 
-        # Use --continue if we have a previous session
         cmd = ["opencode", "run", "--format", "json"]
         if messages:
             cmd.append("--continue")
@@ -123,60 +121,169 @@ def chat_with_opencode(user_message: str, session: dict) -> tuple[bool, str]:
             cwd=str(get_actions_dir()),
         )
 
-        if result.returncode == 0:
-            # Parse response
-            response_text = extract_response_text(result.stdout)
+        if result.returncode != 0:
+            return False, {"error": result.stderr or "OpenCode command failed"}
 
-            # Update session
-            messages.append({"role": "user", "content": user_message})
-            messages.append({"role": "assistant", "content": response_text})
-            session["messages"] = messages
-            save_session(session)
+        payload = extract_opencode_payload(result.stdout)
 
-            return True, response_text
-        else:
-            return False, result.stderr or "OpenCode command failed"
+        now = int(time.time())
+        messages.append({"role": "user", "content": user_message, "ts": now})
+        messages.append(
+            {
+                "role": "assistant",
+                "content": payload.get("text", ""),
+                "ts": int(time.time()),
+                "thinking": payload.get("thinking", ""),
+                "toolCalls": payload.get("toolCalls", ""),
+                "raw": payload.get("raw", ""),
+            }
+        )
+        session["messages"] = messages
+        save_session(session)
+
+        return True, payload
 
     except subprocess.TimeoutExpired:
-        return False, "Request timed out. Please try again."
+        return False, {"error": "Request timed out. Please try again."}
     except subprocess.SubprocessError as e:
-        return False, f"Error: {e}"
+        return False, {"error": f"Error: {e}"}
 
 
-def extract_response_text(stdout: str) -> str:
-    """Extract readable text from OpenCode's JSON output"""
+def _dedupe_consecutive(items: list[str]) -> list[str]:
+    out: list[str] = []
+    for item in items:
+        if item and (not out or out[-1] != item):
+            out.append(item)
+    return out
+
+
+def extract_opencode_payload(stdout: str) -> dict:
+    """Extract readable text + raw events from OpenCode JSON stream."""
+
     lines = stdout.strip().split("\n")
-    text_parts = []
+    text_parts: list[str] = []
+    events: list[dict] = []
+    thinking_parts: list[str] = []
 
     for line in lines:
         if not line.strip():
             continue
+
         try:
             event = json.loads(line)
-            event_type = event.get("type", "")
+            events.append(event)
 
-            # Handle "text" event type - content is in part.text
+            event_type = (event.get("type") or "").strip()
+
             if event_type == "text":
-                part = event.get("part", {})
-                text = part.get("text", "")
-                if text:
-                    text_parts.append(text)
+                part = event.get("part")
+                if isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str) and text:
+                        text_parts.append(text)
+
+                    for key in ("thinking", "thought", "reasoning"):
+                        maybe = part.get(key)
+                        if isinstance(maybe, str) and maybe:
+                            thinking_parts.append(maybe)
+
             elif event_type == "message.completed":
                 content = event.get("message", {}).get("content", "")
-                if content:
+                if isinstance(content, str) and content:
                     text_parts.append(content)
+
         except json.JSONDecodeError:
             # Not JSON, might be plain text output
             if line.strip() and not line.startswith("{"):
                 text_parts.append(line)
 
-    # Deduplicate consecutive identical parts
-    final_parts = []
-    for part in text_parts:
-        if not final_parts or final_parts[-1] != part:
-            final_parts.append(part)
+    text = "\n".join(_dedupe_consecutive(text_parts)).strip()
+    thinking = "\n".join(_dedupe_consecutive(thinking_parts)).strip()
 
-    return "\n".join(final_parts) if final_parts else ""
+    # Heuristic: treat any event with "tool" in its type (or an explicit tool field)
+    # as a tool-call artifact.
+    tool_events = [
+        e
+        for e in events
+        if "tool" in (e.get("type", "").lower()) or e.get("tool") is not None
+    ]
+
+    def pretty(obj) -> str:
+        try:
+            return json.dumps(obj, indent=2, ensure_ascii=False)
+        except TypeError:
+            return str(obj)
+
+    return {
+        "text": text,
+        "thinking": thinking,
+        "toolCalls": pretty(tool_events) if tool_events else "",
+        "raw": pretty(events) if events else "",
+    }
+
+
+def format_time(ts: int) -> str:
+    return datetime.fromtimestamp(ts).strftime("%H:%M")
+
+
+def format_date(ts: int) -> str:
+    return datetime.fromtimestamp(ts).strftime("%b %d, %Y")
+
+
+def build_conversation_card(session: dict, *, title: str) -> dict:
+    messages = session.get("messages", [])
+
+    blocks: list[dict] = []
+
+    last_date = ""
+    for msg in messages:
+        role = msg.get("role", "assistant")
+        content = msg.get("content", "")
+        ts = msg.get("ts")
+        try:
+            ts_int = int(ts) if ts is not None else None
+        except (TypeError, ValueError):
+            ts_int = None
+
+        if ts_int is not None:
+            current_date = format_date(ts_int)
+            if current_date != last_date:
+                blocks.append({"type": "pill", "text": current_date})
+                last_date = current_date
+
+        details = {
+            "thinking": msg.get("thinking", ""),
+            "toolCalls": msg.get("toolCalls", ""),
+            "artifacts": msg.get("artifacts", []),
+            "raw": msg.get("raw", ""),
+        }
+
+        blocks.append(
+            {
+                "type": "message",
+                "role": role,
+                "content": content,
+                "markdown": role != "user",
+                "timestamp": format_time(ts_int) if ts_int is not None else "",
+                "details": details,
+            }
+        )
+
+    transcript = "\n\n".join(
+        f"{m.get('role', 'assistant')}: {m.get('content', '').strip()}".strip()
+        for m in messages
+        if (m.get("content") or "").strip()
+    ).strip()
+
+    return {
+        "kind": "blocks",
+        "title": title,
+        "blocks": blocks,
+        "maxHeight": 820,
+        "showDetails": False,
+        "allowToggleDetails": True,
+        "transcript": transcript,
+    }
 
 
 def main():
@@ -289,42 +396,34 @@ See existing plugins for examples.""",
             return
 
         # Process the query as a message to the AI
-        success, response = chat_with_opencode(query, session)
+        success, payload = chat_with_opencode(query, session)
 
-        if success:
-            # Show AI response as card
-            print(
-                json.dumps(
-                    {
-                        "type": "card",
-                        "card": {
-                            "title": "AI",
-                            "content": response
-                            or "I'm ready to help you create a plugin. What would you like it to do?",
-                            "markdown": True,
-                        },
-                        "inputMode": "submit",
-                        "placeholder": "Type your reply... (Enter to send)",
-                        "clearInput": True,
-                    }
-                )
+        if not success:
+            # Add a system message so the timeline reflects the failure
+            session_messages = session.get("messages", [])
+            session_messages.append(
+                {
+                    "role": "system",
+                    "content": f"Failed to get response: {payload.get('error', 'Unknown error')}",
+                    "ts": int(time.time()),
+                }
             )
-        else:
-            print(
-                json.dumps(
-                    {
-                        "type": "card",
-                        "card": {
-                            "title": "Error",
-                            "content": f"**Failed to get response:**\n\n{response}",
-                            "markdown": True,
-                        },
-                        "inputMode": "submit",
-                        "placeholder": "Try again... (Enter to send)",
-                        "clearInput": True,
-                    }
-                )
+            session["messages"] = session_messages
+            save_session(session)
+
+        card_payload = build_conversation_card(session, title="Create Plugin")
+
+        print(
+            json.dumps(
+                {
+                    "type": "card",
+                    "card": card_payload,
+                    "inputMode": "submit",
+                    "placeholder": "Type your reply... (Enter to send)",
+                    "clearInput": True,
+                }
             )
+        )
         return
 
     if step == "action":
@@ -392,24 +491,14 @@ Just describe what you want to create! The AI will:
             return
 
         if item_id == "continue":
-            # Show last AI message as card
-            messages = session.get("messages", [])
-            last_ai_msg = ""
-            for msg in reversed(messages):
-                if msg.get("role") == "assistant":
-                    last_ai_msg = msg.get("content", "")
-                    break
-
-            if last_ai_msg:
+            if session.get("messages"):
                 print(
                     json.dumps(
                         {
                             "type": "card",
-                            "card": {
-                                "title": "Continuing Conversation",
-                                "content": last_ai_msg,
-                                "markdown": True,
-                            },
+                            "card": build_conversation_card(
+                                session, title="Create Plugin"
+                            ),
                             "inputMode": "submit",
                             "placeholder": "Type your reply... (Enter to send)",
                             "clearInput": True,

@@ -20,10 +20,14 @@ Rectangle {
     // Card data from WorkflowRunner.workflowCard
     // { title: string, content: string, markdown: bool }
     property var card: null
+
+    // When true, show inline loading indicator (keeps content visible)
+    property bool busy: false
     
     property string title: card?.title ?? ""
     property string content: card?.content ?? ""
     property bool markdown: card?.markdown ?? false
+
     
     visible: card !== null
     
@@ -54,10 +58,27 @@ Rectangle {
             wrapMode: Text.Wrap
         }
         
+        // Inline workflow busy indicator (keeps card visible)
+        RowLayout {
+            visible: root.busy
+            Layout.fillWidth: true
+            spacing: 10
+
+            StyledIndeterminateProgressBar {
+                Layout.fillWidth: true
+            }
+
+            StyledText {
+                text: "Processing..."
+                font.pixelSize: Appearance.font.pixelSize.small
+                color: Appearance.colors.colSubtext
+            }
+        }
+
         // Separator
         Rectangle {
             Layout.fillWidth: true
-            visible: root.title !== "" && root.content !== ""
+            visible: (root.title !== "" && root.content !== "") || root.busy
             height: 1
             color: Appearance.colors.colOutlineVariant
         }
@@ -85,13 +106,15 @@ Rectangle {
                 
                 text: root.content
                 textFormat: root.markdown ? TextEdit.MarkdownText : TextEdit.PlainText
+
                 
                 readOnly: true
                 selectByMouse: true
                 wrapMode: TextEdit.Wrap
                 
                 font.family: Appearance.font.family.reading
-                font.pixelSize: Appearance.font.pixelSize.small
+                font.pixelSize: root.markdown ? Appearance.font.pixelSize.smaller : Appearance.font.pixelSize.small
+                font.underline: false
                 color: Appearance.m3colors.m3onSurface
                 selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
                 selectionColor: Appearance.colors.colSecondaryContainer
