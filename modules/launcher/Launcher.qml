@@ -66,6 +66,8 @@ Scope {
                             searchWidget.cancelSearch();
                         }
                         delayedGrabTimer.start();
+                        // Refresh workflows to detect newly added ones (workaround for symlink detection)
+                        WorkflowRunner.refreshWorkflows();
                     }
                 }
             }

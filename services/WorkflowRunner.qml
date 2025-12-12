@@ -36,6 +36,10 @@ Singleton {
     property bool workflowBusy: false  // True while waiting for script response
     property string workflowError: ""  // Last error message
     property var lastSelectedItem: null // Last selected item (persisted across search calls)
+    
+    // Input mode: "realtime" (every keystroke) or "submit" (only on Enter)
+    // Handler controls this via response - allows different modes per step
+    property string inputMode: "realtime"
 
     // Signal when workflow produces results
     signal resultsReady(var results)
@@ -54,6 +58,15 @@ Singleton {
     // Each workflow: { id, path, manifest: { name, description, icon, ... } }
     property var workflows: []
     property var pendingManifestLoads: []
+    
+    // Force refresh workflows - call this when launcher opens to detect new workflows
+    // This works around FolderListModel not detecting changes in symlinked directories
+    function refreshWorkflows() {
+        // Touch the folder property to force FolderListModel to re-scan
+        const currentFolder = workflowsFolder.folder;
+        workflowsFolder.folder = "";
+        workflowsFolder.folder = currentFolder;
+    }
     
     // Load workflows when directory changes
     function loadWorkflows() {
@@ -166,6 +179,7 @@ Singleton {
         root.workflowPrompt = workflow.manifest.steps?.initial?.prompt ?? "";
         root.workflowPlaceholder = "";  // Reset placeholder on workflow start
         root.workflowError = "";
+        root.inputMode = "realtime";  // Default to realtime, handler can change
         
         sendToWorkflow({ step: "initial", session: session });
         return true;
@@ -174,6 +188,8 @@ Singleton {
     // Send search query to active workflow
     function search(query) {
         if (!root.activeWorkflow) return;
+        
+        // Don't clear card here - it should persist until new response arrives
         
         const input = {
             step: "search",
@@ -219,6 +235,7 @@ Singleton {
         root.lastSelectedItem = null;
         root.workflowError = "";
         root.workflowBusy = false;
+        root.inputMode = "realtime";
         workflowProcess.running = false;
         root.workflowClosed();
     }
@@ -282,14 +299,24 @@ Singleton {
                 if (response.context !== undefined) {
                     root.lastSelectedItem = response.context;
                 }
+                // Set input mode from response (defaults to realtime)
+                root.inputMode = response.inputMode ?? "realtime";
                 if (response.clearInput) {
                     root.clearInputRequested();
                 }
-root.resultsReady(root.workflowResults);
+                root.resultsReady(root.workflowResults);
                 break;
                 
             case "card":
                 root.workflowCard = response.card ?? null;
+                if (response.placeholder !== undefined) {
+                    root.workflowPlaceholder = response.placeholder ?? "";
+                }
+                // Set input mode from response (defaults to realtime)
+                root.inputMode = response.inputMode ?? "realtime";
+                if (response.clearInput) {
+                    root.clearInputRequested();
+                }
                 root.cardReady(root.workflowCard);
                 break;
                 

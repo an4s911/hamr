@@ -28,7 +28,7 @@ Rectangle {
     visible: card !== null
     
     Layout.fillWidth: true
-    implicitHeight: cardColumn.implicitHeight + cardColumn.anchors.margins * 2
+    implicitHeight: Math.min(400, cardColumn.implicitHeight + 24)
     
     color: "transparent"
     
@@ -62,41 +62,57 @@ Rectangle {
             color: Appearance.colors.colOutlineVariant
         }
         
-        // Content - supports markdown
-        TextArea {
-            id: contentText
+        // Scrollable content area
+        ScrollView {
+            id: scrollView
             Layout.fillWidth: true
+            Layout.fillHeight: true
             visible: root.content !== ""
             
-            text: root.content
-            textFormat: root.markdown ? TextEdit.MarkdownText : TextEdit.PlainText
+            clip: true
             
-            readOnly: true
-            selectByMouse: true
-            wrapMode: TextEdit.Wrap
-            
-            font.family: Appearance.font.family.reading
-            font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.m3colors.m3onSurface
-            selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
-            selectionColor: Appearance.colors.colSecondaryContainer
-            
-            background: null
-            padding: 0
-            leftPadding: 0
-            rightPadding: 0
-            topPadding: 0
-            bottomPadding: 0
-            
-            onLinkActivated: (link) => {
-                Qt.openUrlExternally(link)
+            ScrollBar.vertical: StyledScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
+            ScrollBar.horizontal: ScrollBar {
+                policy: ScrollBar.AlwaysOff
             }
             
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.NoButton
-                hoverEnabled: true
-                cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
+            // Content - supports markdown
+            TextArea {
+                id: contentText
+                width: scrollView.availableWidth
+                
+                text: root.content
+                textFormat: root.markdown ? TextEdit.MarkdownText : TextEdit.PlainText
+                
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.Wrap
+                
+                font.family: Appearance.font.family.reading
+                font.pixelSize: Appearance.font.pixelSize.small
+                color: Appearance.m3colors.m3onSurface
+                selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
+                selectionColor: Appearance.colors.colSecondaryContainer
+                
+                background: null
+                padding: 0
+                leftPadding: 0
+                rightPadding: 0
+                topPadding: 0
+                bottomPadding: 0
+                
+                onLinkActivated: (link) => {
+                    Qt.openUrlExternally(link)
+                }
+                
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    hoverEnabled: true
+                    cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
+                }
             }
         }
         

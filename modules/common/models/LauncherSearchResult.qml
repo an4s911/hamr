@@ -6,6 +6,9 @@ QtObject {
     enum FontType { Normal, Monospace }
     enum ResultType { Standard, WorkflowEntry, WorkflowResult, Card }
 
+    // Unique key for ScriptModel identity (prevents flicker on updates)
+    property string key: id || name || ""
+    
     // General stuff
     property string type: ""
     property var fontType: LauncherSearchResult.FontType.Normal

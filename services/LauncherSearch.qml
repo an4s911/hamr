@@ -82,7 +82,7 @@ Singleton {
     
     // ==================== WORKFLOW INTEGRATION ====================
     // Active workflow state - when a workflow is active, results come from WorkflowRunner
-    property bool workflowActive: WorkflowRunner.isActive()
+    property bool workflowActive: WorkflowRunner.activeWorkflow !== null
     property string activeWorkflowId: WorkflowRunner.activeWorkflow?.id ?? ""
     
     // Start a workflow by ID
@@ -116,7 +116,9 @@ Singleton {
             root.recordWorkflowExecution(actionInfo);
         }
         function onClearInputRequested() {
+            root.workflowClearing = true;
             root.query = "";
+            root.workflowClearing = false;
         }
     }
     
@@ -855,14 +857,20 @@ Singleton {
     
     // Track if we're intentionally clearing query for workflow start
     property bool workflowStarting: false
+    // Track if we're clearing input after receiving a response (don't trigger search)
+    property bool workflowClearing: false
     
     // Trigger workflow search when query changes
     onQueryChanged: {
         if (WorkflowRunner.isActive()) {
             // Don't exit workflow on empty query - let user use Escape to exit
-            // Just send the query to workflow (debounced)
-            if (!root.workflowStarting) {
-                workflowSearchTimer.restart();
+            // Skip if we're programmatically clearing input after a response
+            if (!root.workflowStarting && !root.workflowClearing) {
+                // Only send search if inputMode is "realtime"
+                // For "submit" mode, wait for Enter key
+                if (WorkflowRunner.inputMode === "realtime") {
+                    workflowSearchTimer.restart();
+                }
             }
         } else if (root.query === root.filePrefix) {
             // Start files workflow when ~ is typed
@@ -870,6 +878,13 @@ Singleton {
         } else if (root.query === Config.options.search.prefix.clipboard) {
             // Start clipboard workflow when ; is typed
             root.startWorkflow("clipboard");
+        }
+    }
+    
+    // Submit workflow query (called on Enter key in submit mode)
+    function submitWorkflowQuery() {
+        if (WorkflowRunner.isActive() && WorkflowRunner.inputMode === "submit") {
+            WorkflowRunner.search(root.query);
         }
     }
     
@@ -999,9 +1014,12 @@ Singleton {
         // Search results are handled here
         
         ////////////////// Workflow mode - show workflow results //////////////////
-        if (WorkflowRunner.isActive()) {
+        // Use property access (not function call) to ensure proper QML binding
+        const _workflowActive = WorkflowRunner.activeWorkflow !== null;
+        const _workflowResults = WorkflowRunner.workflowResults;
+        if (_workflowActive) {
             // Convert workflow results to LauncherSearchResult objects
-            return root.workflowResultsToSearchResults(WorkflowRunner.workflowResults);
+            return root.workflowResultsToSearchResults(_workflowResults);
         }
         
         ////////////////// Empty query - show recent history //////////////////
