@@ -17,6 +17,30 @@ Singleton {
     
     // Flag to skip auto-focus on next results update (set by action buttons)
     property bool skipNextAutoFocus: false
+    
+    // ==================== EXCLUSIVE MODE ====================
+    // Exclusive mode is for prefix-based filtering (/, :, =) that doesn't use workflows
+    // but should still allow Escape to exit back to normal search
+    property string exclusiveMode: ""  // "", "action", "emoji", "math"
+    property bool exclusiveModeStarting: false  // Flag to prevent re-triggering on query clear
+    
+    function enterExclusiveMode(mode) {
+        root.exclusiveModeStarting = true;
+        root.exclusiveMode = mode;
+        root.query = "";
+        root.exclusiveModeStarting = false;
+    }
+    
+    function exitExclusiveMode() {
+        if (root.exclusiveMode !== "") {
+            root.exclusiveMode = "";
+            root.query = "";
+        }
+    }
+    
+    function isInExclusiveMode() {
+        return root.exclusiveMode !== "";
+    }
 
     // ==================== WINDOW PICKER SUPPORT ====================
     // Window picker state is managed in GlobalStates
@@ -264,6 +288,61 @@ Singleton {
         return items;
     }
     
+    // Prepared workflow history terms for fuzzy search
+    // Allows finding workflows by previously used search terms (e.g., "q" -> QuickLinks)
+    property var preppedWorkflowHistoryTerms: {
+        const items = [];
+        for (const historyItem of searchHistoryData) {
+            if (historyItem.type === "workflow" && historyItem.recentSearchTerms) {
+                for (const term of historyItem.recentSearchTerms) {
+                    items.push({
+                        name: Fuzzy.prepare(term),
+                        workflowId: historyItem.name,
+                        searchTerm: term,
+                        historyItem: historyItem
+                    });
+                }
+            }
+        }
+        return items;
+    }
+    
+    // Prepared action history terms for fuzzy search
+    property var preppedActionHistoryTerms: {
+        const items = [];
+        for (const historyItem of searchHistoryData) {
+            if (historyItem.type === "action" && historyItem.recentSearchTerms) {
+                for (const term of historyItem.recentSearchTerms) {
+                    items.push({
+                        name: Fuzzy.prepare(term),
+                        actionName: historyItem.name,
+                        searchTerm: term,
+                        historyItem: historyItem
+                    });
+                }
+            }
+        }
+        return items;
+    }
+    
+    // Prepared quicklink history terms for fuzzy search
+    property var preppedQuicklinkHistoryTerms: {
+        const items = [];
+        for (const historyItem of searchHistoryData) {
+            if (historyItem.type === "quicklink" && historyItem.recentSearchTerms) {
+                for (const term of historyItem.recentSearchTerms) {
+                    items.push({
+                        name: Fuzzy.prepare(term),
+                        quicklinkName: historyItem.name,
+                        searchTerm: term,
+                        historyItem: historyItem
+                    });
+                }
+            }
+        }
+        return items;
+    }
+    
     // Prepared workflow execution history for fuzzy search
     // Indexes both the action name and workflow name for matching
     property var preppedWorkflowExecutions: {
@@ -273,6 +352,44 @@ Singleton {
                 name: Fuzzy.prepare(`${item.workflowName} ${item.name}`),
                 historyItem: item
             }));
+    }
+    
+    // Prepared workflow execution history terms for fuzzy search
+    // Allows finding workflow executions by previously used search terms
+    property var preppedWorkflowExecutionHistoryTerms: {
+        const items = [];
+        for (const historyItem of searchHistoryData) {
+            if (historyItem.type === "workflowExecution" && historyItem.recentSearchTerms) {
+                for (const term of historyItem.recentSearchTerms) {
+                    items.push({
+                        name: Fuzzy.prepare(term),
+                        executionKey: historyItem.key,
+                        searchTerm: term,
+                        historyItem: historyItem
+                    });
+                }
+            }
+        }
+        return items;
+    }
+    
+    // Prepared URL history terms for fuzzy search
+    // Allows finding URLs by previously used search terms (e.g., "gh" -> "https://github.com")
+    property var preppedUrlHistoryTerms: {
+        const items = [];
+        for (const historyItem of searchHistoryData) {
+            if (historyItem.type === "url" && historyItem.recentSearchTerms) {
+                for (const term of historyItem.recentSearchTerms) {
+                    items.push({
+                        name: Fuzzy.prepare(term),
+                        url: historyItem.name,
+                        searchTerm: term,
+                        historyItem: historyItem
+                    });
+                }
+            }
+        }
+        return items;
     }
 
     FileView {
@@ -295,6 +412,24 @@ Singleton {
                 searchHistoryFileView.setText(JSON.stringify({ history: [] }));
             }
             root.searchHistoryData = [];
+        }
+    }
+
+    // Remove a history item by type and identifier
+    // For workflowExecution: uses key (workflowId:name)
+    // For windowFocus: uses key (windowFocus:appId:windowTitle)
+    // For others: uses type + name
+    function removeHistoryItem(historyType, identifier) {
+        let newHistory;
+        if (historyType === "workflowExecution" || historyType === "windowFocus") {
+            newHistory = searchHistoryData.filter(h => !(h.type === historyType && h.key === identifier));
+        } else {
+            newHistory = searchHistoryData.filter(h => !(h.type === historyType && h.name === identifier));
+        }
+        
+        if (newHistory.length !== searchHistoryData.length) {
+            searchHistoryData = newHistory;
+            searchHistoryFileView.setText(JSON.stringify({ history: newHistory }, null, 2));
         }
     }
 
@@ -357,7 +492,8 @@ Singleton {
     //   - command: Direct shell command for simple replay (fast, no workflow needed)
     //   - entryPoint: Workflow step for complex actions (invokes handler logic)
     // On replay: prefers command if available, falls back to entryPoint
-    function recordWorkflowExecution(actionInfo) {
+    // searchTerm: optional search term used to find this execution (for learned shortcuts)
+    function recordWorkflowExecution(actionInfo, searchTerm) {
         const now = Date.now();
         // Use name + workflowId as unique key
         const key = `${actionInfo.workflowId}:${actionInfo.name}`;
@@ -370,6 +506,15 @@ Singleton {
         if (existingIndex >= 0) {
             // Update existing entry
             const existing = newHistory[existingIndex];
+            let recentTerms = existing.recentSearchTerms || [];
+            
+            // Add new search term to front, remove duplicates, limit size
+            if (searchTerm) {
+                recentTerms = recentTerms.filter(t => t !== searchTerm);
+                recentTerms.unshift(searchTerm);
+                recentTerms = recentTerms.slice(0, maxRecentSearchTerms);
+            }
+            
             newHistory[existingIndex] = {
                 type: existing.type,
                 key: existing.key,
@@ -381,7 +526,8 @@ Singleton {
                 icon: actionInfo.icon,
                 thumbnail: actionInfo.thumbnail,
                 count: existing.count + 1,
-                lastUsed: now
+                lastUsed: now,
+                recentSearchTerms: recentTerms
             };
         } else {
             // Add new entry
@@ -396,7 +542,8 @@ Singleton {
                 icon: actionInfo.icon,
                 thumbnail: actionInfo.thumbnail,
                 count: 1,
-                lastUsed: now
+                lastUsed: now,
+                recentSearchTerms: searchTerm ? [searchTerm] : []
             });
         }
         
@@ -644,80 +791,57 @@ Singleton {
     // Tier 3: Secondary results (Emoji, URL History, Shell History) - compete by match quality
     // Tier 4: Fallback (Web search) - always last
     // ======================================================================
+    // FRECENCY-BASED RANKING
+    // All results compete in a single pool sorted by match quality + frecency.
+    // Web search always shown last as fallback.
+    // ======================================================================
     
-    function getTierConfig(detectedIntent) {
-        // Returns which categories go in which tier
-        // Categories in the same tier compete by match quality
-        let tier1 = [];
-        
-        switch (detectedIntent) {
-            case root.intent.COMMAND:
-                tier1 = [root.category.COMMAND];
-                break;
-            case root.intent.MATH:
-                tier1 = [root.category.MATH];
-                break;
-            case root.intent.URL:
-                tier1 = [root.category.URL_DIRECT];
-                break;
-        }
-        
-        return {
-            tier1: tier1,  // Intent-specific (shown first, in order)
-            tier2: [root.category.APP, root.category.ACTION, root.category.WORKFLOW, root.category.QUICKLINK],  // Primary (compete)
-            tier3: [root.category.WORKFLOW_EXECUTION, root.category.URL_HISTORY, root.category.EMOJI],  // Secondary (compete)
-            tier4: [root.category.WEB_SEARCH]  // Fallback (always last)
-        };
-    }
-    
-    // Merge results using tiered + competitive approach
-    function mergeByTiers(categorized, tierConfig, limits) {
+    // Merge all results using pure frecency-based ranking
+    function mergeByFrecency(categorized, limits, detectedIntent) {
         const merged = [];
+        const seenKeys = new Set();
         
-        // Tier 1: Intent-specific results (in order, not competing)
-        for (const cat of tierConfig.tier1) {
-            const results = categorized[cat] || [];
-            const limit = limits[cat] ?? 1;
-            for (let i = 0; i < Math.min(results.length, limit); i++) {
-                merged.push(results[i]);
+        // Helper to add result if not duplicate
+        const addResult = (r) => {
+            const key = r.result?.id || r.result?.name;
+            if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                merged.push(r);
             }
-        }
+        };
         
-        // Tier 2: Primary results - collect all, sort by match quality, then limit
-        const tier2Results = [];
-        for (const cat of tierConfig.tier2) {
+        // All categories compete in one pool (except web search)
+        const competingCategories = [
+            root.category.APP,
+            root.category.ACTION,
+            root.category.WORKFLOW,
+            root.category.QUICKLINK,
+            root.category.WORKFLOW_EXECUTION,
+            root.category.URL_HISTORY,
+            root.category.URL_DIRECT,
+            root.category.EMOJI,
+            root.category.COMMAND,
+            root.category.MATH
+        ];
+        
+        const allResults = [];
+        for (const cat of competingCategories) {
             const results = categorized[cat] || [];
             const limit = limits[cat] ?? 5;
-            // Tag each result with its category for potential future use
-            results.slice(0, limit).forEach(r => {
-                tier2Results.push(r);
-            });
+            results.slice(0, limit).forEach(r => allResults.push(r));
         }
-        tier2Results.sort(root.compareResults);
-        // Take top results from tier 2 (limit total)
-        const tier2Limit = 12;
-        tier2Results.slice(0, tier2Limit).forEach(r => merged.push(r));
         
-        // Tier 3: Secondary results - collect all, sort by match quality, then limit
-        const tier3Results = [];
-        for (const cat of tierConfig.tier3) {
-            const results = categorized[cat] || [];
-            const limit = limits[cat] ?? 3;
-            results.slice(0, limit).forEach(r => {
-                tier3Results.push(r);
-            });
-        }
-        tier3Results.sort(root.compareResults);
-        // Take top results from tier 3 (limit total)
-        const tier3Limit = 6;
-        tier3Results.slice(0, tier3Limit).forEach(r => merged.push(r));
+        // Sort by match quality + frecency
+        allResults.sort(root.compareResults);
         
-        // Tier 4: Fallback (always last)
-        for (const cat of tierConfig.tier4) {
-            const results = categorized[cat] || [];
-            for (let i = 0; i < Math.min(results.length, 1); i++) {
-                merged.push(results[i]);
-            }
+        // Take top results
+        const maxResults = 15;
+        allResults.slice(0, maxResults).forEach(addResult);
+        
+        // Web search always last as fallback
+        const webResults = categorized[root.category.WEB_SEARCH] || [];
+        if (webResults.length > 0) {
+            addResult(webResults[0]);
         }
         
         return merged;
@@ -740,33 +864,36 @@ Singleton {
         return root.matchType.FUZZY;
     }
     
-    // Compare two results for sorting within a category
+    // Compare two results for sorting
     // Returns negative if a should come before b
+    // 
+    // Ranking strategy:
+    // - EXACT match (learned shortcut) + frecency = highest priority
+    // - For non-EXACT matches, fuzzy score matters more than frecency
+    //   (prevents high-frecency items from appearing for unrelated queries)
     function compareResults(a, b) {
-        // 1. Match type (exact > prefix > fuzzy)
-        if (a.matchType !== b.matchType) return b.matchType - a.matchType;
-        // 2. Fuzzy score (higher is better, but scores can be negative)
-        if (a.fuzzyScore !== b.fuzzyScore) return b.fuzzyScore - a.fuzzyScore;
-        // 3. Frecency (higher is better)
-        return b.frecency - a.frecency;
-    }
-    
-    // Merge results from multiple categories based on priority order
-    // Takes limited items from each category to create balanced results
-    function mergeByPriority(categorizedResults, priorityOrder, limits) {
-        const merged = [];
-        const defaultLimit = 5;
+        const aIsExact = a.matchType === root.matchType.EXACT;
+        const bIsExact = b.matchType === root.matchType.EXACT;
         
-        for (const category of priorityOrder) {
-            const results = categorizedResults[category] || [];
-            const limit = limits[category] ?? defaultLimit;
-            // Results are already sorted within category
-            for (let i = 0; i < Math.min(results.length, limit); i++) {
-                merged.push(results[i]);
-            }
+        // 1. EXACT matches (learned shortcuts) always beat non-EXACT
+        if (aIsExact !== bIsExact) {
+            return aIsExact ? -1 : 1;
         }
         
-        return merged;
+        // 2. Among EXACT matches, frecency decides (learned shortcuts compete by usage)
+        if (aIsExact && bIsExact) {
+            if (Math.abs(a.frecency - b.frecency) > 1) {
+                return b.frecency - a.frecency;
+            }
+            // If frecency is similar, use fuzzy score
+            return b.fuzzyScore - a.fuzzyScore;
+        }
+        
+        // 3. Among non-EXACT matches, fuzzy score first, then frecency as tiebreaker
+        if (a.fuzzyScore !== b.fuzzyScore) {
+            return b.fuzzyScore - a.fuzzyScore;
+        }
+        return b.frecency - a.frecency;
     }
     
     // ==================== COMBINED SCORING ====================
@@ -962,15 +1089,30 @@ Singleton {
                     workflowSearchTimer.restart();
                 }
             }
-        } else if (root.query === root.filePrefix) {
-            // Start files workflow when ~ is typed
-            root.startWorkflow("files");
-        } else if (root.query === Config.options.search.prefix.clipboard) {
-            // Start clipboard workflow when ; is typed
-            root.startWorkflow("clipboard");
-        } else if (root.query === Config.options.search.prefix.shellHistory) {
-            // Start shell workflow when ! is typed
-            root.startWorkflow("shell");
+        } else if (root.isInExclusiveMode()) {
+            // Already in exclusive mode, just let the query filter results
+            // (no special handling needed)
+        } else if (!root.exclusiveModeStarting) {
+            // Check for prefix triggers (not in workflow or exclusive mode)
+            if (root.query === root.filePrefix) {
+                // Start files workflow when ~ is typed
+                root.startWorkflow("files");
+            } else if (root.query === Config.options.search.prefix.clipboard) {
+                // Start clipboard workflow when ; is typed
+                root.startWorkflow("clipboard");
+            } else if (root.query === Config.options.search.prefix.shellHistory) {
+                // Start shell workflow when ! is typed
+                root.startWorkflow("shell");
+            } else if (root.query === Config.options.search.prefix.action) {
+                // Enter exclusive action mode when / is typed
+                root.enterExclusiveMode("action");
+            } else if (root.query === Config.options.search.prefix.emojis) {
+                // Enter exclusive emoji mode when : is typed
+                root.enterExclusiveMode("emoji");
+            } else if (root.query === Config.options.search.prefix.math) {
+                // Enter exclusive math mode when = is typed
+                root.enterExclusiveMode("math");
+            }
         }
     }
     
@@ -1075,13 +1217,19 @@ Singleton {
         interval: Config.options.search.nonAppResultDelay
         onTriggered: {
             let expr = root.query;
+            // Strip math prefix if present (for non-exclusive mode)
             if (expr.startsWith(Config.options.search.prefix.math)) {
                 expr = expr.slice(Config.options.search.prefix.math.length);
             }
             
-            // Only calculate if it looks like math
-            if (root.isMathExpression(expr)) {
-                mathProc.calculateExpression(expr);
+            // In exclusive math mode, always try to calculate (query is already the expression)
+            // Otherwise, only calculate if it looks like math
+            if (root.exclusiveMode === "math" || root.isMathExpression(expr)) {
+                if (expr.trim()) {
+                    mathProc.calculateExpression(expr);
+                } else {
+                    root.mathResult = "";
+                }
             } else {
                 root.mathResult = "";
             }
@@ -1131,6 +1279,14 @@ Singleton {
                 .slice()
                 .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
                 .map(item => {
+                    // Helper to create remove action for history items
+                    const makeRemoveAction = (historyType, identifier) => ({
+                        name: "Remove",
+                        iconName: "delete",
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: () => root.removeHistoryItem(historyType, identifier)
+                    });
+                    
                     if (item.type === "app") {
                         const entry = AppSearch.list.find(app => app.id === item.name);
                         if (!entry) return null;
@@ -1141,6 +1297,7 @@ Singleton {
                             iconName: entry.icon,
                             iconType: LauncherSearchResult.IconType.System,
                             verb: "Open",
+                            actions: [makeRemoveAction("app", item.name)],
                             execute: () => {
                                 // Smart execute: check windows at execution time
                                 const currentWindows = WindowManager.getWindowsForApp(entry.id);
@@ -1166,6 +1323,7 @@ Singleton {
                             iconName: 'settings_suggest',
                             iconType: LauncherSearchResult.IconType.Material,
                             verb: "Run",
+                            actions: [makeRemoveAction("action", item.name)],
                             execute: () => {
                                 root.recordSearch("action", action.action, "");
                                 action.execute("");
@@ -1181,6 +1339,7 @@ Singleton {
                             iconType: LauncherSearchResult.IconType.Material,
                             resultType: LauncherSearchResult.ResultType.WorkflowEntry,
                             verb: "Open",
+                            actions: [makeRemoveAction("workflow", item.name)],
                             execute: () => {
                                 root.recordSearch("workflow", item.name, "");
                                 root.startWorkflow(item.name);
@@ -1195,6 +1354,7 @@ Singleton {
                             iconName: link.icon || 'link',
                             iconType: LauncherSearchResult.IconType.Material,
                             verb: "Open",
+                            actions: [makeRemoveAction("quicklink", item.name)],
                             execute: () => {
                                 root.recordSearch("quicklink", link.name, "");
                                 Qt.openUrlExternally(link.url.replace("{query}", ""));
@@ -1208,6 +1368,7 @@ Singleton {
                             iconName: 'open_in_browser',
                             iconType: LauncherSearchResult.IconType.Material,
                             verb: "Open",
+                            actions: [makeRemoveAction("url", item.name)],
                             execute: () => {
                                 root.recordSearch("url", item.name, "");
                                 Quickshell.execDetached(["xdg-open", item.name]);
@@ -1224,6 +1385,7 @@ Singleton {
                             iconName: 'description',
                             iconType: LauncherSearchResult.IconType.Material,
                             verb: "Open",
+                            actions: [makeRemoveAction("file", item.name)],
                             execute: () => {
                                 root.recordSearch("file", item.name, "");
                                 Quickshell.execDetached(["xdg-open", item.name]);
@@ -1237,8 +1399,9 @@ Singleton {
                             iconType: LauncherSearchResult.IconType.Material,
                             thumbnail: item.thumbnail || "",
                             verb: "Run",
+                            actions: [makeRemoveAction("workflowExecution", item.key)],
                             execute: () => {
-                                // Re-record to update frecency
+                                // Re-record to update frecency (no search term for Recent items)
                                 root.recordWorkflowExecution({
                                     name: item.name,
                                     command: item.command,
@@ -1247,7 +1410,7 @@ Singleton {
                                     thumbnail: item.thumbnail,
                                     workflowId: item.workflowId,
                                     workflowName: item.workflowName
-                                });
+                                }, "");
                                 // Hybrid replay: prefer command, fallback to entryPoint
                                 if (item.command && item.command.length > 0) {
                                     // Direct command execution (fast path)
@@ -1267,6 +1430,7 @@ Singleton {
                             iconName: item.iconName,
                             iconType: LauncherSearchResult.IconType.System,
                             verb: "Focus",
+                            actions: [makeRemoveAction("windowFocus", item.key)],
                             execute: () => {
                                 // Find window by title
                                 const windows = WindowManager.getWindowsForApp(item.appId);
@@ -1303,9 +1467,9 @@ Singleton {
 
         ///////////// Special cases (exclusive - return early) ///////////////
         
-        // Actions/Workflows with prefix - show only actions and workflows
-        if (root.query.startsWith(Config.options.search.prefix.action)) {
-            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.action).split(" ")[0];
+        // Actions/Workflows in exclusive mode - show only actions and workflows
+        if (root.exclusiveMode === "action") {
+            const searchString = root.query.split(" ")[0];
             const actionArgs = root.query.split(" ").slice(1).join(" ");
             
             // Get actions
@@ -1351,9 +1515,9 @@ Singleton {
             return [...workflowItems, ...actionItems].filter(Boolean);
         }
         
-        // Emojis with prefix - show full emoji results
-        if (root.query.startsWith(Config.options.search.prefix.emojis)) {
-            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);
+        // Emojis in exclusive mode - show full emoji results
+        if (root.exclusiveMode === "emoji") {
+            const searchString = root.query;
             return Emojis.fuzzyQuery(searchString).map(entry => {
                 const emoji = entry.match(/^\s*(\S+)/)?.[1] || "";
                 return resultComp.createObject(null, {
@@ -1368,6 +1532,26 @@ Singleton {
                     }
                 });
             }).filter(Boolean);
+        }
+        
+        // Math in exclusive mode - show only math result
+        if (root.exclusiveMode === "math") {
+            // Trigger math calculation
+            nonAppResultsTimer.restart();
+            
+            // Use the query directly as math expression
+            if (root.mathResult && root.mathResult !== root.query) {
+                return [resultComp.createObject(null, {
+                    name: root.mathResult,
+                    verb: "Copy",
+                    type: "Math result",
+                    fontType: LauncherSearchResult.FontType.Monospace,
+                    iconName: 'calculate',
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => { Quickshell.clipboardText = root.mathResult; }
+                })];
+            }
+            return [];
         }
         
 
@@ -1443,8 +1627,10 @@ Singleton {
             ? root.query.split(" ").slice(1).join(" ")
             : "";
         
+        const seenActions = new Set();
         const actionResults = Fuzzy.go(actionQuery, root.preppedActions, { key: "name", limit: 10 }).map(result => {
             const action = result.obj.action;
+            seenActions.add(action.action);
             const frecency = root.getHistoryBoost("action", action.action);
             const historyItem = root.searchHistoryData.find(h => h.type === "action" && h.name === action.action);
             const recentTerms = historyItem?.recentSearchTerms || [];
@@ -1473,6 +1659,38 @@ Singleton {
                 })
             };
         });
+        
+        // Add action history term matches
+        const actionHistoryTermResults = Fuzzy.go(actionQuery, root.preppedActionHistoryTerms, { key: "name", limit: 5 });
+        
+        actionHistoryTermResults
+            .filter(result => !seenActions.has(result.obj.actionName))
+            .forEach(result => {
+                const action = root.allActions.find(a => a.action === result.obj.actionName);
+                if (!action) return;
+                seenActions.add(action.action);
+                const hasArgs = actionArgs.length > 0;
+                
+                actionResults.push({
+                    matchType: root.matchType.EXACT, // Term match = treated as exact
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(result.obj.historyItem),
+                    result: resultComp.createObject(null, {
+                        name: action.action + (hasArgs ? " " + actionArgs : ""),
+                        verb: "Run",
+                        type: "Action",
+                        iconName: 'settings_suggest',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        acceptsArguments: !hasArgs,
+                        completionText: !hasArgs ? action.action + " " : "",
+                        execute: () => {
+                            root.recordSearch("action", action.action, root.query);
+                            action.execute(actionArgs);
+                        }
+                    })
+                });
+            });
+        
         categorized[root.category.ACTION] = actionResults.sort(root.compareResults);
         
         // ========== WORKFLOWS ==========
@@ -1489,7 +1707,11 @@ Singleton {
                 const workflow = result.obj.workflow;
                 const manifest = workflow.manifest;
                 const frecency = root.getHistoryBoost("workflow", workflow.id);
-                const resultMatchType = root.getMatchType(actionQuery, workflow.id);
+                const historyItem = root.searchHistoryData.find(h => h.type === "workflow" && h.name === workflow.id);
+                const recentTerms = historyItem?.recentSearchTerms || [];
+                const resultMatchType = root.getTermMatchBoost(recentTerms, actionQuery) > 0 
+                    ? root.matchType.EXACT 
+                    : root.getMatchType(actionQuery, workflow.id);
                 
                 return {
                     matchType: resultMatchType,
@@ -1513,6 +1735,40 @@ Singleton {
                     })
                 };
             });
+        
+        // Add workflow history term matches (e.g., "q" -> QuickLinks if user previously typed "q" to find it)
+        const workflowHistoryTermResults = Fuzzy.go(actionQuery, root.preppedWorkflowHistoryTerms, { key: "name", limit: 5 });
+        
+        workflowHistoryTermResults
+            .filter(result => !seenWorkflows.has(result.obj.workflowId))
+            .forEach(result => {
+                const workflow = WorkflowRunner.getWorkflow(result.obj.workflowId);
+                if (!workflow) return;
+                seenWorkflows.add(result.obj.workflowId);
+                const manifest = workflow.manifest;
+                workflowResults.push({
+                    matchType: root.matchType.EXACT, // Term match = treated as exact
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(result.obj.historyItem),
+                    result: resultComp.createObject(null, {
+                        name: manifest?.name ?? workflow.id,
+                        comment: manifest?.description ?? "",
+                        verb: "Start",
+                        type: "Workflow",
+                        iconName: manifest?.icon ?? 'extension',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        resultType: LauncherSearchResult.ResultType.WorkflowEntry,
+                        workflowId: workflow.id,
+                        acceptsArguments: true,
+                        completionText: workflow.id + " ",
+                        execute: () => {
+                            root.recordSearch("workflow", workflow.id, root.query);
+                            root.startWorkflow(workflow.id);
+                        }
+                    })
+                });
+            });
+        
         categorized[root.category.WORKFLOW] = workflowResults.sort(root.compareResults).slice(0, 3);
         
         // ========== QUICKLINKS ==========
@@ -1540,9 +1796,15 @@ Singleton {
             // Check if this quicklink accepts a query argument
             const acceptsQuery = link.url.includes("{query}");
             
+            // Check term match boost for discovery (how user found this quicklink)
+            const historyItem = searchHistoryData.find(h => h.type === "quicklink" && h.name === link.name);
+            const recentTerms = historyItem?.recentSearchTerms || [];
+            const termMatchBoost = root.getTermMatchBoost(recentTerms, quicklinkQuery);
+            const boostedMatchType = termMatchBoost > 0 ? root.matchType.EXACT : resultMatchType;
+            
             if (hasSearchTerm) {
                 quicklinkResults.push({
-                    matchType: resultMatchType,
+                    matchType: boostedMatchType,
                     fuzzyScore: result._score,
                     frecency: frecency,
                     result: resultComp.createObject(null, {
@@ -1553,21 +1815,19 @@ Singleton {
                         completionText: "",
                         iconName: link.icon || 'link',
                         iconType: LauncherSearchResult.IconType.Material,
-                        execute: () => {
-                            root.recordSearch("quicklink", link.name, quicklinkSearchTerm);
+                        execute: ((capturedDiscoveryTerm) => () => {
+                            // Record the discovery term (how user found quicklink)
+                            root.recordSearch("quicklink", link.name, capturedDiscoveryTerm);
                             const url = link.url.replace("{query}", encodeURIComponent(quicklinkSearchTerm));
                             Qt.openUrlExternally(url);
-                        }
+                        })(quicklinkQuery)
                     })
                 });
             } else {
-                // Get recent search terms
-                const historyItem = searchHistoryData.find(h => h.type === "quicklink" && h.name === link.name);
-                const recentTerms = historyItem?.recentSearchTerms || [];
-                
+                // Show recent search terms for this quicklink
                 recentTerms.forEach((term, idx) => {
                     quicklinkResults.push({
-                        matchType: resultMatchType,
+                        matchType: boostedMatchType,
                         fuzzyScore: result._score - idx * 10, // Slight penalty for older terms
                         frecency: frecency,
                         result: resultComp.createObject(null, {
@@ -1578,17 +1838,18 @@ Singleton {
                             iconType: LauncherSearchResult.IconType.Material,
                             acceptsArguments: false, // Already has argument
                             completionText: "",
-                            execute: () => {
-                                root.recordSearch("quicklink", link.name, term);
-                                const url = link.url.replace("{query}", encodeURIComponent(term));
+                            execute: ((capturedDiscoveryTerm, capturedSearchTerm) => () => {
+                                // Record the discovery term (how user found quicklink)
+                                root.recordSearch("quicklink", link.name, capturedDiscoveryTerm);
+                                const url = link.url.replace("{query}", encodeURIComponent(capturedSearchTerm));
                                 Qt.openUrlExternally(url);
-                            }
+                            })(quicklinkQuery, term)
                         })
                     });
                 });
                 
                 quicklinkResults.push({
-                    matchType: resultMatchType,
+                    matchType: boostedMatchType,
                     fuzzyScore: result._score - 50, // Base quicklink below recent searches
                     frecency: frecency,
                     result: resultComp.createObject(null, {
@@ -1599,15 +1860,50 @@ Singleton {
                         iconType: LauncherSearchResult.IconType.Material,
                         acceptsArguments: acceptsQuery,
                         completionText: acceptsQuery ? displayName + " " : "",
-                        execute: () => {
-                            root.recordSearch("quicklink", link.name, "");
+                        execute: ((capturedDiscoveryTerm) => () => {
+                            // Record the discovery term (how user found quicklink)
+                            root.recordSearch("quicklink", link.name, capturedDiscoveryTerm);
                             const url = link.url.replace("{query}", "");
                             Qt.openUrlExternally(url);
-                        }
+                        })(quicklinkQuery)
                     })
                 });
             }
         });
+        
+        // Add quicklink history term matches (find quicklinks by previously used search terms)
+        // This is for finding the quicklink itself, not the search terms used with it
+        const quicklinkHistoryTermResults = Fuzzy.go(quicklinkQuery, root.preppedQuicklinkHistoryTerms, { key: "name", limit: 5 });
+        
+        quicklinkHistoryTermResults
+            .filter(result => !seenQuicklinks.has(result.obj.quicklinkName))
+            .forEach(result => {
+                const link = root.quicklinks.find(q => q.name === result.obj.quicklinkName);
+                if (!link) return;
+                seenQuicklinks.add(result.obj.quicklinkName);
+                const acceptsQuery = link.url.includes("{query}");
+                
+                quicklinkResults.push({
+                    matchType: root.matchType.EXACT, // Term match = treated as exact
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(result.obj.historyItem),
+                    result: resultComp.createObject(null, {
+                        name: link.name,
+                        verb: acceptsQuery ? "Search" : "Open",
+                        type: "Quicklink",
+                        iconName: link.icon || 'link',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        acceptsArguments: acceptsQuery,
+                        completionText: acceptsQuery ? link.name + " " : "",
+                        execute: ((capturedDiscoveryTerm) => () => {
+                            root.recordSearch("quicklink", link.name, capturedDiscoveryTerm);
+                            const url = link.url.replace("{query}", "");
+                            Qt.openUrlExternally(url);
+                        })(quicklinkQuery)
+                    })
+                });
+            });
+        
         categorized[root.category.QUICKLINK] = quicklinkResults.sort(root.compareResults);
         
         // ========== URL (Direct) ==========
@@ -1626,10 +1922,10 @@ Singleton {
                     fontType: LauncherSearchResult.FontType.Monospace,
                     iconName: 'open_in_browser',
                     iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => {
-                        root.recordSearch("url", normalizedUrl, "");
+                    execute: ((capturedQuery) => () => {
+                        root.recordSearch("url", normalizedUrl, capturedQuery);
                         Quickshell.execDetached(["xdg-open", normalizedUrl]);
-                    }
+                    })(root.query)
                 })
             }];
         } else {
@@ -1637,33 +1933,80 @@ Singleton {
         }
         
         // ========== URL History ==========
+        const seenUrls = new Set([normalizedUrl]);
         const urlHistoryResults = Fuzzy.go(root.query, root.preppedUrlHistory, { key: "name", limit: 5 })
             .filter(result => result.obj.url !== normalizedUrl)
-            .map(result => ({
-                matchType: root.getMatchType(root.query, root.stripProtocol(result.obj.url)),
-                fuzzyScore: result._score,
-                frecency: root.getFrecencyScore(result.obj.historyItem),
-                result: resultComp.createObject(null, {
-                    name: result.obj.url,
-                    verb: "Open",
-                    type: "URL" + " - recent",
-                    fontType: LauncherSearchResult.FontType.Monospace,
-                    iconName: 'open_in_browser',
-                    iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => {
-                        root.recordSearch("url", result.obj.url, "");
-                        Quickshell.execDetached(["xdg-open", result.obj.url]);
-                    }
-                })
-            }));
+            .map(result => {
+                const url = result.obj.url;
+                seenUrls.add(url);
+                const historyItem = result.obj.historyItem;
+                const recentTerms = historyItem?.recentSearchTerms || [];
+                const resultMatchType = root.getTermMatchBoost(recentTerms, root.query) > 0 
+                    ? root.matchType.EXACT 
+                    : root.getMatchType(root.query, root.stripProtocol(url));
+                
+                return {
+                    matchType: resultMatchType,
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(historyItem),
+                    result: resultComp.createObject(null, {
+                        name: url,
+                        verb: "Open",
+                        type: "URL" + " - recent",
+                        fontType: LauncherSearchResult.FontType.Monospace,
+                        iconName: 'open_in_browser',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: ((capturedQuery) => () => {
+                            root.recordSearch("url", url, capturedQuery);
+                            Quickshell.execDetached(["xdg-open", url]);
+                        })(root.query)
+                    })
+                };
+            });
+        
+        // Add URL history term matches
+        const urlHistoryTermResults = Fuzzy.go(root.query, root.preppedUrlHistoryTerms, { key: "name", limit: 5 });
+        
+        urlHistoryTermResults
+            .filter(result => !seenUrls.has(result.obj.url))
+            .forEach(result => {
+                const url = result.obj.url;
+                seenUrls.add(url);
+                
+                urlHistoryResults.push({
+                    matchType: root.matchType.EXACT,
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(result.obj.historyItem),
+                    result: resultComp.createObject(null, {
+                        name: url,
+                        verb: "Open",
+                        type: "URL" + " - recent",
+                        fontType: LauncherSearchResult.FontType.Monospace,
+                        iconName: 'open_in_browser',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        execute: ((capturedQuery) => () => {
+                            root.recordSearch("url", url, capturedQuery);
+                            Quickshell.execDetached(["xdg-open", url]);
+                        })(root.query)
+                    })
+                });
+            });
+        
         categorized[root.category.URL_HISTORY] = urlHistoryResults.sort(root.compareResults);
         
         // ========== WORKFLOW EXECUTIONS ==========
+        const seenWorkflowExecutions = new Set();
         const workflowExecResults = Fuzzy.go(root.query, root.preppedWorkflowExecutions, { key: "name", limit: 5 })
             .map(result => {
                 const item = result.obj.historyItem;
+                seenWorkflowExecutions.add(item.key);
+                const recentTerms = item.recentSearchTerms || [];
+                const resultMatchType = root.getTermMatchBoost(recentTerms, root.query) > 0 
+                    ? root.matchType.EXACT 
+                    : root.matchType.FUZZY;
+                
                 return {
-                    matchType: root.matchType.FUZZY,
+                    matchType: resultMatchType,
                     fuzzyScore: result._score,
                     frecency: root.getFrecencyScore(item),
                     result: resultComp.createObject(null, {
@@ -1673,7 +2016,7 @@ Singleton {
                         iconType: LauncherSearchResult.IconType.Material,
                         thumbnail: item.thumbnail || "",
                         verb: "Run",
-                        execute: () => {
+                        execute: ((capturedQuery) => () => {
                             root.recordWorkflowExecution({
                                 name: item.name,
                                 command: item.command,
@@ -1682,7 +2025,7 @@ Singleton {
                                 thumbnail: item.thumbnail,
                                 workflowId: item.workflowId,
                                 workflowName: item.workflowName
-                            });
+                            }, capturedQuery);
                             // Hybrid replay: prefer command, fallback to entryPoint
                             if (item.command && item.command.length > 0) {
                                 // Direct command execution (fast path)
@@ -1691,10 +2034,51 @@ Singleton {
                                 // Workflow replay via entryPoint (complex actions)
                                 WorkflowRunner.replayAction(item.workflowId, item.entryPoint);
                             }
-                        }
+                        })(root.query)
                     })
                 };
             });
+        
+        // Add workflow execution history term matches
+        const workflowExecHistoryTermResults = Fuzzy.go(root.query, root.preppedWorkflowExecutionHistoryTerms, { key: "name", limit: 5 });
+        
+        workflowExecHistoryTermResults
+            .filter(result => !seenWorkflowExecutions.has(result.obj.executionKey))
+            .forEach(result => {
+                const item = result.obj.historyItem;
+                seenWorkflowExecutions.add(item.key);
+                
+                workflowExecResults.push({
+                    matchType: root.matchType.EXACT, // Term match = treated as exact
+                    fuzzyScore: result._score,
+                    frecency: root.getFrecencyScore(item),
+                    result: resultComp.createObject(null, {
+                        type: item.workflowName || "Recent",
+                        name: item.name,
+                        iconName: item.icon || 'play_arrow',
+                        iconType: LauncherSearchResult.IconType.Material,
+                        thumbnail: item.thumbnail || "",
+                        verb: "Run",
+                        execute: ((capturedQuery) => () => {
+                            root.recordWorkflowExecution({
+                                name: item.name,
+                                command: item.command,
+                                entryPoint: item.entryPoint,
+                                icon: item.icon,
+                                thumbnail: item.thumbnail,
+                                workflowId: item.workflowId,
+                                workflowName: item.workflowName
+                            }, capturedQuery);
+                            if (item.command && item.command.length > 0) {
+                                Quickshell.execDetached(item.command);
+                            } else if (item.entryPoint && item.workflowId) {
+                                WorkflowRunner.replayAction(item.workflowId, item.entryPoint);
+                            }
+                        })(root.query)
+                    })
+                });
+            });
+        
         categorized[root.category.WORKFLOW_EXECUTION] = workflowExecResults.sort(root.compareResults);
         
         // ========== EMOJI ==========
@@ -1787,9 +2171,8 @@ Singleton {
             })
         }];
         
-        // Merge results using tiered + competitive approach
-        const tierConfig = root.getTierConfig(detectedIntent);
-        const merged = root.mergeByTiers(categorized, tierConfig, categoryLimits);
+        // Merge results using pure frecency-based ranking
+        const merged = root.mergeByFrecency(categorized, categoryLimits, detectedIntent);
         
         return merged.map(item => item.result);
     }

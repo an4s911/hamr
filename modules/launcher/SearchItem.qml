@@ -190,7 +190,8 @@ RippleButton {
     }
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier) {
-            const deleteAction = root.entry.actions.find(action => action.name == "Delete");
+            // Look for Delete or Remove action (Remove is used for history items)
+            const deleteAction = root.entry.actions.find(action => action.name === "Delete" || action.name === "Remove");
 
             if (deleteAction) {
                 deleteAction.execute()

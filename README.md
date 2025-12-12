@@ -15,6 +15,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 ## Features
 
 - **Frecency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))
+- **Learned search affinity** - System learns your search shortcuts (type "q" to find QuickLinks if that's how you found it before)
 - **Intent detection** - Auto-detects URLs, math expressions, and commands
 - **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort)
 - **Extensible plugins** - Python handlers with simple JSON protocol
@@ -39,9 +40,19 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 | `quicklinks` | `/quicklinks` | Web search with customizable quicklinks |
 | `dict` | `/dict` | Dictionary lookup with definitions |
 | `pictures` | `/pictures` | Browse images with thumbnails |
+| `snippet` | `/snippet` | Text snippets for quick insertion |
 | `todo` | `/todo` | Simple todo list manager |
 | `wallpaper` | `/wallpaper` | Wallpaper selector (illogical-impulse) |
 | `create-plugin` | `/create-plugin` | AI helper to create new plugins (requires [OpenCode](https://opencode.ai)) |
+
+### Simple Actions (Scripts)
+
+| Action | Description |
+|--------|-------------|
+| `screenshot` | Take screenshot with grim + satty |
+| `dark` | Switch to dark mode (illogical-impulse) |
+| `light` | Switch to light mode (illogical-impulse) |
+| `accentcolor` | Set accent color (illogical-impulse) |
 
 ## Installation
 
@@ -270,6 +281,39 @@ notify-send "Screenshot copied"
 Appears in search as `/screenshot`.
 
 </details>
+
+## Smart Search: Learned Shortcuts
+
+Hamr learns your search habits and creates automatic shortcuts. No configuration needed.
+
+**How it works:**
+1. Type "ff", scroll to "Firefox", press Enter
+2. Next time you type "ff", Firefox appears at the top
+3. The system remembers the last 5 search terms for each item
+
+**Ranking algorithm:**
+1. **Learned shortcuts first** - Items where you've used that exact search term before rank highest
+2. **Frecency decides ties** - Among learned shortcuts, most frequently/recently used wins
+3. **Fuzzy matches last** - Items that match but you haven't searched that way before
+
+This means an item you use 10 times with "ff" will beat a command named "ff" that you've never executed.
+
+**What's tracked:**
+- Apps, actions, workflows, quicklinks
+- URLs, workflow executions (wallpaper changes, file opens, etc.)
+- Each item stores up to 5 recent search terms
+
+**Example:**
+```
+Type "ff" → select Firefox → "ff" recorded
+Type "ff" → select Firefox → frecency increased
+Type "ff" → Firefox is now first (beats other "ff" matches you never use)
+
+Type "wl" → select "Set wallpaper: sunset.jpg" → "wl" recorded
+Type "wl" → wallpaper action appears first
+```
+
+Terms naturally age out based on frecency, so your shortcuts stay relevant as habits change.
 
 ## Configuration
 

@@ -39,6 +39,10 @@ Item { // Wrapper
     function cancelSearch() {
         searchBar.searchInput.selectAll();
         LauncherSearch.query = "";
+        // Also exit exclusive mode when cancelling search
+        if (LauncherSearch.isInExclusiveMode()) {
+            LauncherSearch.exclusiveMode = "";
+        }
         searchBar.animateWidth = true;
     }
 

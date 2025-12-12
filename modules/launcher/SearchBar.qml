@@ -18,8 +18,16 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
     
-    // Custom placeholder from active workflow
+    // Custom placeholder from active workflow or exclusive mode
     readonly property string workflowPlaceholder: WorkflowRunner.isActive() ? WorkflowRunner.workflowPlaceholder : ""
+    readonly property string exclusiveModePlaceholder: {
+        switch (LauncherSearch.exclusiveMode) {
+            case "action": return "Search actions...";
+            case "emoji": return "Search emoji...";
+            case "math": return "Calculate...";
+            default: return "";
+        }
+    }
 
     function forceFocus() {
         searchInput.forceActiveFocus();
@@ -28,6 +36,11 @@ RowLayout {
     enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, DefaultSearch }
 
     property var searchPrefixType: {
+        // Check exclusive mode first
+        if (LauncherSearch.exclusiveMode === "action") return SearchBar.SearchPrefixType.Action;
+        if (LauncherSearch.exclusiveMode === "emoji") return SearchBar.SearchPrefixType.Emojis;
+        if (LauncherSearch.exclusiveMode === "math") return SearchBar.SearchPrefixType.Math;
+        // Fall back to prefix detection for non-exclusive modes
         if (root.searchingText.startsWith(Config.options.search.prefix.action)) return SearchBar.SearchPrefixType.Action;
         if (root.searchingText.startsWith(Config.options.search.prefix.app)) return SearchBar.SearchPrefixType.App;
         if (root.searchingText.startsWith(Config.options.search.prefix.clipboard)) return SearchBar.SearchPrefixType.Clipboard;
@@ -76,7 +89,8 @@ RowLayout {
         implicitHeight: 40
         focus: GlobalStates.launcherOpen
         font.pixelSize: Appearance.font.pixelSize.small
-        placeholderText: root.workflowPlaceholder !== "" ? root.workflowPlaceholder : "Let's get things done"
+        placeholderText: root.workflowPlaceholder !== "" ? root.workflowPlaceholder : 
+                         root.exclusiveModePlaceholder !== "" ? root.exclusiveModePlaceholder : "Let's get things done"
         implicitWidth: Appearance.sizes.searchWidth
 
         Behavior on implicitWidth {

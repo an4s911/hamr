@@ -65,6 +65,10 @@ Scope {
                         if (WorkflowRunner.isActive()) {
                             LauncherSearch.closeWorkflow();
                         }
+                        // Clear exclusive mode when closing
+                        if (LauncherSearch.isInExclusiveMode()) {
+                            LauncherSearch.exclusiveMode = "";
+                        }
                     } else {
                         if (!launcherScope.dontAutoCancelSearch) {
                             searchWidget.cancelSearch();
@@ -160,9 +164,11 @@ Scope {
 
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Escape) {
-                        // If workflow is active, exit workflow first; otherwise close launcher
+                        // Priority: workflow > exclusive mode > close launcher
                         if (WorkflowRunner.isActive()) {
                             LauncherSearch.exitWorkflow();
+                        } else if (LauncherSearch.isInExclusiveMode()) {
+                            LauncherSearch.exitExclusiveMode();
                         } else {
                             GlobalStates.launcherOpen = false;
                         }
