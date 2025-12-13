@@ -182,7 +182,7 @@ MouseArea {
         border.width: 1
         border.color: Appearance.colors.colLayer0Border
         color: Appearance.colors.colLayer0
-        radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
+        radius: Appearance.rounding.normal
 
         property int calculatedRows: Math.ceil(grid.count / grid.columns)
 
@@ -243,7 +243,7 @@ MouseArea {
                             colBackgroundToggled: Appearance.colors.colSecondaryContainer
                             colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
                             colRippleToggled: Appearance.colors.colSecondaryContainerActive
-                            buttonRadius: height / 2
+                            buttonRadius: Appearance.rounding.verysmall
                             implicitHeight: 38
 
                             contentItem: RowLayout {

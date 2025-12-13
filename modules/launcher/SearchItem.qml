@@ -7,6 +7,7 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
@@ -46,7 +47,7 @@ RippleButton {
     property bool isRunning: windowCount > 0
 
     visible: root.entryShown
-    property int horizontalMargin: 10
+    property int horizontalMargin: 4
     property int buttonHorizontalPadding: 10
     property int buttonVerticalPadding: 6
     property bool keyboardDown: false
@@ -103,7 +104,7 @@ RippleButton {
 
     implicitHeight: rowLayout.implicitHeight + root.buttonVerticalPadding * 2
     implicitWidth: rowLayout.implicitWidth + root.buttonHorizontalPadding * 2
-    buttonRadius: Appearance.rounding.normal
+    buttonRadius: Appearance.rounding.verysmall
     colBackground: (root.down || root.keyboardDown) ? Appearance.colors.colPrimaryContainerActive : 
         ((root.hovered || root.focus) ? Appearance.colors.colPrimaryContainer : 
         ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1))
@@ -223,78 +224,70 @@ RippleButton {
 
     RowLayout {
         id: rowLayout
-        spacing: iconLoader.sourceComponent === null ? 0 : 10
+        spacing: iconContainer.visible ? 10 : 0
         anchors.fill: parent
         anchors.leftMargin: root.horizontalMargin + root.buttonHorizontalPadding
         anchors.rightMargin: root.horizontalMargin + root.buttonHorizontalPadding
 
-        // Icon or Thumbnail
-        Loader {
-            id: iconLoader
+        // Unified icon container - fixed size for visual consistency
+        Item {
+            id: iconContainer
             Layout.alignment: Qt.AlignVCenter
-            active: true
-            sourceComponent: {
-                // Thumbnail takes priority if present
-                if (root.thumbnail !== "") return thumbnailComponent;
-                
-                switch(root.iconType) {
-                    case LauncherSearchResult.IconType.Material:
-                        return materialSymbolComponent
-                    case LauncherSearchResult.IconType.Text:
-                        return bigTextComponent
-                    case LauncherSearchResult.IconType.System:
-                        return iconImageComponent
-                    case LauncherSearchResult.IconType.None:
-                        return null
-                    default:
-                        return null
-                }
-            }
-        }
-
-
-
-        Component {
-            id: thumbnailComponent
+            visible: root.thumbnail !== "" || root.iconType !== LauncherSearchResult.IconType.None
+            
+            // Fixed container size - all icon types fit within this
+            property int containerSize: 40
+            implicitWidth: containerSize
+            implicitHeight: containerSize
+            
+            // Thumbnail (takes priority)
             Rectangle {
-                width: 48
-                height: 48
-                radius: Appearance.rounding.small
+                id: thumbnailRect
+                visible: root.thumbnail !== ""
+                anchors.fill: parent
+                radius: 4
                 color: Appearance.colors.colSurfaceContainerHigh
-                clip: true
                 
                 Image {
                     anchors.fill: parent
                     source: root.thumbnail ? `file://${root.thumbnail}` : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    sourceSize.width: 96
-                    sourceSize.height: 96
+                    sourceSize.width: 80
+                    sourceSize.height: 80
+                    layer.enabled: true
+                    layer.effect: OpacityMask {
+                        maskSource: Rectangle {
+                            width: thumbnailRect.width
+                            height: thumbnailRect.height
+                            radius: thumbnailRect.radius
+                        }
+                    }
                 }
             }
-        }
-
-        Component {
-            id: iconImageComponent
+            
+            // System icon (app icons)
             IconImage {
-                source: Quickshell.iconPath(root.iconName, "image-missing")
-                width: 35
-                height: 35
+                visible: !thumbnailRect.visible && root.iconType === LauncherSearchResult.IconType.System
+                anchors.centerIn: parent
+                source: root.iconName ? Quickshell.iconPath(root.iconName, "image-missing") : ""
+                width: 32
+                height: 32
             }
-        }
-
-        Component {
-            id: materialSymbolComponent
+            
+            // Material symbol
             MaterialSymbol {
+                visible: !thumbnailRect.visible && root.iconType === LauncherSearchResult.IconType.Material
+                anchors.centerIn: parent
                 text: root.materialSymbol
-                iconSize: 30
+                iconSize: 26
                 color: Appearance.m3colors.m3onSurface
             }
-        }
-
-        Component {
-            id: bigTextComponent
+            
+            // Text/emoji icon
             StyledText {
+                visible: !thumbnailRect.visible && root.iconType === LauncherSearchResult.IconType.Text
+                anchors.centerIn: parent
                 text: root.bigText
                 font.pixelSize: Appearance.font.pixelSize.larger
                 color: Appearance.m3colors.m3onSurface
@@ -366,7 +359,7 @@ RippleButton {
                     Rectangle {
                         id: actionBg
                         anchors.fill: parent
-                        radius: Appearance.rounding.small
+                        radius: Appearance.rounding.verysmall
                         color: actionButton.isFocused ? Appearance.colors.colPrimary :
                                actionMouse.containsMouse ? Appearance.colors.colSecondaryContainerHover : "transparent"
                         Behavior on color {

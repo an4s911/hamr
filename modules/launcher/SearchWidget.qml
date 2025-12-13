@@ -114,7 +114,7 @@ Item { // Wrapper
         clip: true
         implicitWidth: columnLayout.implicitWidth
         implicitHeight: columnLayout.implicitHeight
-        radius: searchBar.height / 2 + searchBar.padding
+        radius: Appearance.rounding.normal
         color: Appearance.colors.colBackgroundSurfaceContainer
 
         Behavior on implicitHeight {
@@ -141,14 +141,20 @@ Item { // Wrapper
                 }
             }
 
-            SearchBar {
-                id: searchBar
-                property real padding: 4
-                Layout.fillWidth: true
-                Layout.leftMargin: padding
-                Layout.rightMargin: padding
-                Layout.topMargin: padding
-                Layout.bottomMargin: padding
+            // Elevated search bar container
+            Rectangle {
+                id: searchBarContainer
+                implicitWidth: searchBar.implicitWidth + 12
+                implicitHeight: searchBar.implicitHeight + 12
+                Layout.margins: 6
+                radius: Appearance.rounding.small
+                color: Appearance.colors.colSurfaceContainerHigh
+                border.width: 1
+                border.color: Appearance.colors.colSurfaceContainerHighest
+                
+                SearchBar {
+                    id: searchBar
+                    anchors.centerIn: parent
                 Synchronizer on searchingText {
                     property alias source: root.searchingText
                 }
@@ -208,6 +214,7 @@ Item { // Wrapper
                         }
                     }
                 }
+            }
             }
 
             // Hint bar - shows prefix shortcuts when query is empty, navigation hints when results shown
@@ -327,19 +334,33 @@ Item { // Wrapper
                 }
             }
 
-            ListView { // App results
-                id: appResults
+            // Results container with recessed background
+            Rectangle {
+                id: resultsContainer
                 visible: root.showResults && !root.showCard && !WorkflowRunner.workflowBusy
                 Layout.fillWidth: true
-                implicitHeight: Math.min(600, appResults.contentHeight + topMargin + bottomMargin)
-                clip: true
-                cacheBuffer: 500  // Keep more delegates cached to reduce flicker
-                reuseItems: true  // Enable delegate reuse
-                topMargin: 10
-                bottomMargin: 10
-                spacing: 2
-                KeyNavigation.up: searchBar
-                highlightMoveDuration: 100
+                Layout.leftMargin: 6
+                Layout.rightMargin: 6
+                Layout.bottomMargin: 6
+                Layout.topMargin: 4
+                implicitHeight: appResults.implicitHeight
+                radius: Appearance.rounding.small
+                color: Appearance.colors.colSurfaceContainerLow
+                border.width: 1
+                border.color: Appearance.m3colors.m3surfaceContainerLowest
+                
+                ListView { // App results
+                    id: appResults
+                    anchors.fill: parent
+                    implicitHeight: Math.min(600, appResults.contentHeight + topMargin + bottomMargin)
+                    clip: true
+                    cacheBuffer: 500  // Keep more delegates cached to reduce flicker
+                    reuseItems: true  // Enable delegate reuse
+                    topMargin: 6
+                    bottomMargin: 6
+                    spacing: 2
+                    KeyNavigation.up: searchBar
+                    highlightMoveDuration: 100
 
                 onFocusChanged: {
                     if (focus)
@@ -382,6 +403,7 @@ Item { // Wrapper
                         Config.options.search.prefix.shellCommand,
                         Config.options.search.prefix.webSearch
                     ])
+                }
                 }
             }
         }

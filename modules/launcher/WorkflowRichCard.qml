@@ -104,7 +104,7 @@ Rectangle {
                 visible: root.allowToggleDetails
                 implicitHeight: 28
                 implicitWidth: toggleRow.implicitWidth + 16
-                buttonRadius: Appearance.rounding.small
+                buttonRadius: Appearance.rounding.verysmall
 
                 colBackground: Appearance.colors.colSecondaryContainer
                 colBackgroundHover: Appearance.colors.colSecondaryContainerHover
@@ -228,7 +228,7 @@ Rectangle {
                 id: copyTranscriptButton
                 implicitHeight: 28
                 implicitWidth: copyRow.implicitWidth + 16
-                buttonRadius: Appearance.rounding.small
+                buttonRadius: Appearance.rounding.verysmall
 
                 colBackground: Appearance.colors.colSecondaryContainer
                 colBackgroundHover: Appearance.colors.colSecondaryContainerHover
@@ -397,7 +397,7 @@ Rectangle {
                     id: messageContainer
                     width: parent.width
                     implicitWidth: width
-                    radius: Appearance.rounding.normal
+                    radius: Appearance.rounding.verysmall
                     color: bubbleColor()
 
                     implicitHeight: messageColumn.implicitHeight + 20
@@ -499,7 +499,7 @@ Rectangle {
         property bool expanded: false
 
         Layout.fillWidth: true
-        radius: Appearance.rounding.small
+        radius: Appearance.rounding.verysmall
         color: Appearance.colors.colSurfaceContainer
         border.width: 1
         border.color: Appearance.colors.colOutlineVariant

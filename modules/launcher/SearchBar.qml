@@ -90,7 +90,7 @@ RowLayout {
         focus: GlobalStates.launcherOpen
         font.pixelSize: Appearance.font.pixelSize.small
         placeholderText: root.workflowPlaceholder !== "" ? root.workflowPlaceholder : 
-                         root.exclusiveModePlaceholder !== "" ? root.exclusiveModePlaceholder : "Let's get things done"
+                         root.exclusiveModePlaceholder !== "" ? root.exclusiveModePlaceholder : "It's hamr time!"
         implicitWidth: Appearance.sizes.searchWidth
 
         Behavior on implicitWidth {

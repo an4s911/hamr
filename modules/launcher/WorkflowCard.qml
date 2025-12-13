@@ -151,7 +151,7 @@ Rectangle {
                 id: copyButton
                 implicitHeight: 28
                 implicitWidth: copyRow.implicitWidth + 16
-                buttonRadius: Appearance.rounding.small
+                buttonRadius: Appearance.rounding.verysmall
                 
                 colBackground: Appearance.colors.colSecondaryContainer
                 colBackgroundHover: Appearance.colors.colSecondaryContainerHover

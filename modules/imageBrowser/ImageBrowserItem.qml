@@ -28,7 +28,7 @@ MouseArea {
     Rectangle {
         id: background
         anchors.fill: parent
-        radius: Appearance.rounding.normal
+        radius: Appearance.rounding.verysmall
         Behavior on color {
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
         }
@@ -50,7 +50,7 @@ MouseArea {
                     sourceComponent: StyledRectangularShadow {
                         target: thumbnailImageLoader
                         anchors.fill: undefined
-                        radius: Appearance.rounding.small
+                        radius: 4
                     }
                 }
 
@@ -90,7 +90,7 @@ MouseArea {
                             maskSource: Rectangle {
                                 width: wallpaperItemImageContainer.width
                                 height: wallpaperItemImageContainer.height
-                                radius: Appearance.rounding.small
+                                radius: 4
                             }
                         }
                     }
