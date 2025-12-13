@@ -69,6 +69,7 @@ Singleton {
     // Each workflow: { id, path, manifest: { name, description, icon, ... } }
     property var workflows: []
     property var pendingManifestLoads: []
+    property bool workflowsLoaded: false  // True when all manifests have been loaded
     
     // Force refresh workflows - call this when launcher opens to detect new workflows
     // This works around FolderListModel not detecting changes in symlinked directories
@@ -82,6 +83,7 @@ Singleton {
     // Load workflows when directory changes
     function loadWorkflows() {
         root.pendingManifestLoads = [];
+        root.workflowsLoaded = false;
         
         for (let i = 0; i < workflowsFolder.count; i++) {
             const fileName = workflowsFolder.get(i, "fileName");
@@ -99,11 +101,15 @@ Singleton {
         
         if (root.pendingManifestLoads.length > 0) {
             loadNextManifest();
+        } else {
+            // No workflows to load - mark as loaded immediately
+            root.workflowsLoaded = true;
         }
     }
     
     function loadNextManifest() {
         if (root.pendingManifestLoads.length === 0) {
+            root.workflowsLoaded = true;
             return;
         }
         

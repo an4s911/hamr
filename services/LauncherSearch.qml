@@ -18,6 +18,10 @@ Singleton {
     // Flag to skip auto-focus on next results update (set by action buttons)
     property bool skipNextAutoFocus: false
     
+    // Loading guards: prevent flickering by waiting for async data to load
+    property bool historyLoaded: false
+    property bool quicklinksLoaded: false
+    
     // ==================== EXCLUSIVE MODE ====================
     // Exclusive mode is for prefix-based filtering (/, :, =) that doesn't use workflows
     // but should still allow Escape to exit back to normal search
@@ -218,10 +222,12 @@ Singleton {
                 console.log("[Quicklinks] Failed to parse quicklinks.json:", e);
                 root.quicklinks = [];
             }
+            root.quicklinksLoaded = true;
         }
         onLoadFailed: error => {
             console.log("[Quicklinks] Failed to load quicklinks.json:", error);
             root.quicklinks = [];
+            root.quicklinksLoaded = true;
         }
     }
 
@@ -405,6 +411,7 @@ Singleton {
                 console.log("[SearchHistory] Failed to parse:", e);
                 root.searchHistoryData = [];
             }
+            root.historyLoaded = true;
         }
         onLoadFailed: error => {
             if (error == FileViewError.FileNotFound) {
@@ -412,6 +419,7 @@ Singleton {
                 searchHistoryFileView.setText(JSON.stringify({ history: [] }));
             }
             root.searchHistoryData = [];
+            root.historyLoaded = true;
         }
     }
 
@@ -1265,6 +1273,10 @@ Singleton {
         
         ////////////////// Empty query - show recent history //////////////////
         if (root.query == "") {
+            // Loading guard: wait for all async data sources to load before showing results
+            // This prevents flickering where list populates incrementally
+            if (!root.historyLoaded || !root.quicklinksLoaded || !WorkflowRunner.workflowsLoaded) return [];
+            
             // Force dependency on quicklinks and allActions for re-evaluation
             const _quicklinksLoaded = root.quicklinks.length;
             const _actionsLoaded = root.allActions.length;
