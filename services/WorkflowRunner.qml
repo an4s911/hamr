@@ -444,6 +444,7 @@ Singleton {
                             command: exec.command ?? [],
                             entryPoint: exec.entryPoint ?? null,  // For workflow replay
                             icon: exec.icon ?? workflowIcon,
+                            iconType: exec.iconType ?? "material",  // "system" for app icons
                             thumbnail: exec.thumbnail ?? "",
                             workflowId: workflowId,
                             workflowName: workflowName

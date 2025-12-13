@@ -17,7 +17,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 - **Frecency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))
 - **Learned search affinity** - System learns your search shortcuts (type "q" to find QuickLinks if that's how you found it before)
 - **Intent detection** - Auto-detects URLs, math expressions, and commands
-- **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort)
+- **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort), includes desktop entry keywords (e.g., "whatsapp" finds ZapZap)
 - **Extensible plugins** - Python handlers with simple JSON protocol
 - **History tracking** - Search, plugin actions, and shell command history
 
@@ -33,6 +33,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 
 | Plugin | Trigger | Description |
 |--------|---------|-------------|
+| `apps` | `/apps` | App drawer with categories (like rofi/dmenu) |
 | `files` | `~` | File search with fd + fzf, thumbnails for images |
 | `clipboard` | `;` | Clipboard history with image support |
 | `shell` | `!` | Shell command history (zsh/bash/fish) |

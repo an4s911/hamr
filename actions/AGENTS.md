@@ -108,7 +108,8 @@ Display a list of selectable items.
             "id": "unique-id",           # Required: used for selection
             "name": "Display Name",      # Required: main text
             "description": "Subtitle",   # Optional: shown below name
-            "icon": "material_icon",     # Optional: Material icon name
+            "icon": "material_icon",     # Optional: icon name (see Icon Types below)
+            "iconType": "material",      # Optional: "material" (default) or "system"
             "thumbnail": "/path/to/img", # Optional: image (overrides icon)
             "verb": "Open",              # Optional: hover action text
             "actions": [                 # Optional: action buttons
@@ -170,6 +171,7 @@ Execute a shell command, optionally save to history.
         "command": ["xdg-open", "/path/to/file"],
         "name": "Open document.pdf",    # Required for history
         "icon": "description",           # Optional: icon in history
+        "iconType": "material",          # Optional: "material" (default) or "system"
         "thumbnail": "/path/to/thumb",   # Optional: image preview
         "close": true
     }
@@ -523,9 +525,11 @@ if __name__ == "__main__":
 
 ---
 
-## Material Icons
+## Icon Types
 
-Use any icon from [Material Symbols](https://fonts.google.com/icons).
+### Material Icons (default)
+
+Use any icon from [Material Symbols](https://fonts.google.com/icons). This is the default when `iconType` is not specified.
 
 | Category | Icons |
 |----------|-------|
@@ -535,12 +539,35 @@ Use any icon from [Material Symbols](https://fonts.google.com/icons).
 | UI | `search`, `settings`, `star`, `favorite`, `info`, `error` |
 | Special | `dark_mode`, `light_mode`, `wallpaper`, `key`, `person` |
 
+### System Icons
+
+For desktop application icons from `.desktop` files, set `"iconType": "system"`:
+
+```python
+{
+    "id": "app-id",
+    "name": "Google Chrome",
+    "icon": "google-chrome",      # System icon name from .desktop file
+    "iconType": "system"          # Required for system icons
+}
+```
+
+**Common system icon patterns:**
+- Reverse domain: `org.gnome.Calculator`, `com.discordapp.Discord`
+- Kebab-case: `google-chrome`, `visual-studio-code`
+- Simple names: `btop`, `blueman`, `firefox`
+
+**Auto-detection:** If `iconType` is not specified, icons with `.` or `-` are assumed to be system icons. For simple names like `btop`, you must explicitly set `"iconType": "system"`.
+
+**Example plugin:** [`apps/`](apps/) - App launcher using system icons
+
 ---
 
 ## Built-in Plugins Reference
 
 | Plugin | Trigger | Features | Key Patterns |
 |--------|---------|----------|--------------|
+| [`apps/`](apps/) | `/apps` | App drawer with categories | System icons, category navigation |
 | [`files/`](files/) | `~` | File search with fd+fzf, thumbnails | Results with thumbnails, action buttons |
 | [`clipboard/`](clipboard/) | `;` | Clipboard history with images | Image thumbnails, wipe action |
 | [`shell/`](shell/) | `!` | Shell command history | Simple results, execute commands |

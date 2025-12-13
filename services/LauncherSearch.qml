@@ -182,13 +182,28 @@ Singleton {
                 });
             });
             
+            // Detect icon type based on iconType field from workflow, or auto-detect
+            // If workflow explicitly sets iconType: "system" or "material", use that
+            // Otherwise, default to Material icons (most workflow icons are material symbols)
+            const iconName = item.icon ?? WorkflowRunner.activeWorkflow?.manifest?.icon ?? 'extension';
+            let isSystemIcon;
+            if (item.iconType === "system") {
+                isSystemIcon = true;
+            } else if (item.iconType === "material") {
+                isSystemIcon = false;
+            } else {
+                // Auto-detect: System icons typically have dots or dashes (e.g., "org.gnome.Calculator", "google-chrome")
+                // Default to Material for simple names (e.g., "apps", "folder", "play_circle")
+                isSystemIcon = iconName.includes('.') || iconName.includes('-');
+            }
+            
             return resultComp.createObject(null, {
                 name: item.name,
                 comment: item.description ?? "",
                 verb: item.verb ?? "Select",
                 type: WorkflowRunner.activeWorkflow?.manifest?.name ?? "Workflow",
-                iconName: item.icon ?? WorkflowRunner.activeWorkflow?.manifest?.icon ?? 'extension',
-                iconType: LauncherSearchResult.IconType.Material,
+                iconName: iconName,
+                iconType: isSystemIcon ? LauncherSearchResult.IconType.System : LauncherSearchResult.IconType.Material,
                 resultType: LauncherSearchResult.ResultType.WorkflowResult,
                 workflowId: WorkflowRunner.activeWorkflow?.id ?? "",
                 workflowItemId: itemId,
@@ -532,6 +547,7 @@ Singleton {
                 command: actionInfo.command,
                 entryPoint: actionInfo.entryPoint ?? null,
                 icon: actionInfo.icon,
+                iconType: actionInfo.iconType ?? existing.iconType ?? "material",
                 thumbnail: actionInfo.thumbnail,
                 count: existing.count + 1,
                 lastUsed: now,
@@ -548,6 +564,7 @@ Singleton {
                 command: actionInfo.command,
                 entryPoint: actionInfo.entryPoint ?? null,
                 icon: actionInfo.icon,
+                iconType: actionInfo.iconType ?? "material",
                 thumbnail: actionInfo.thumbnail,
                 count: 1,
                 lastUsed: now,
@@ -1404,11 +1421,15 @@ Singleton {
                             }
                         });
                     } else if (item.type === "workflowExecution") {
+                        // Determine icon type from stored value
+                        const iconType = item.iconType === "system" 
+                            ? LauncherSearchResult.IconType.System 
+                            : LauncherSearchResult.IconType.Material;
                         return resultComp.createObject(null, {
                             type: item.workflowName || "Recent",
                             name: item.name,
                             iconName: item.icon || 'play_arrow',
-                            iconType: LauncherSearchResult.IconType.Material,
+                            iconType: iconType,
                             thumbnail: item.thumbnail || "",
                             verb: "Run",
                             actions: [makeRemoveAction("workflowExecution", item.key)],
@@ -1419,6 +1440,7 @@ Singleton {
                                     command: item.command,
                                     entryPoint: item.entryPoint,
                                     icon: item.icon,
+                                    iconType: item.iconType,
                                     thumbnail: item.thumbnail,
                                     workflowId: item.workflowId,
                                     workflowName: item.workflowName
@@ -2017,6 +2039,10 @@ Singleton {
                     ? root.matchType.EXACT 
                     : root.matchType.FUZZY;
                 
+                // Determine icon type from stored value
+                const wfIconType = item.iconType === "system" 
+                    ? LauncherSearchResult.IconType.System 
+                    : LauncherSearchResult.IconType.Material;
                 return {
                     matchType: resultMatchType,
                     fuzzyScore: result._score,
@@ -2025,7 +2051,7 @@ Singleton {
                         type: item.workflowName || "Recent",
                         name: item.name,
                         iconName: item.icon || 'play_arrow',
-                        iconType: LauncherSearchResult.IconType.Material,
+                        iconType: wfIconType,
                         thumbnail: item.thumbnail || "",
                         verb: "Run",
                         execute: ((capturedQuery) => () => {
@@ -2034,6 +2060,7 @@ Singleton {
                                 command: item.command,
                                 entryPoint: item.entryPoint,
                                 icon: item.icon,
+                                iconType: item.iconType,
                                 thumbnail: item.thumbnail,
                                 workflowId: item.workflowId,
                                 workflowName: item.workflowName
@@ -2060,6 +2087,10 @@ Singleton {
                 const item = result.obj.historyItem;
                 seenWorkflowExecutions.add(item.key);
                 
+                // Determine icon type from stored value
+                const termIconType = item.iconType === "system" 
+                    ? LauncherSearchResult.IconType.System 
+                    : LauncherSearchResult.IconType.Material;
                 workflowExecResults.push({
                     matchType: root.matchType.EXACT, // Term match = treated as exact
                     fuzzyScore: result._score,
@@ -2068,7 +2099,7 @@ Singleton {
                         type: item.workflowName || "Recent",
                         name: item.name,
                         iconName: item.icon || 'play_arrow',
-                        iconType: LauncherSearchResult.IconType.Material,
+                        iconType: termIconType,
                         thumbnail: item.thumbnail || "",
                         verb: "Run",
                         execute: ((capturedQuery) => () => {
@@ -2077,6 +2108,7 @@ Singleton {
                                 command: item.command,
                                 entryPoint: item.entryPoint,
                                 icon: item.icon,
+                                iconType: item.iconType,
                                 thumbnail: item.thumbnail,
                                 workflowId: item.workflowId,
                                 workflowName: item.workflowName
