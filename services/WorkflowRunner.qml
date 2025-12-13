@@ -31,6 +31,7 @@ Singleton {
     property var activeWorkflow: null  // { id, path, manifest, session }
     property var workflowResults: []   // Current results from workflow
     property var workflowCard: null    // Card to display (title, content, markdown)
+    property var workflowForm: null    // Form to display (title, fields, submitLabel)
     property string workflowPrompt: "" // Custom prompt text
     property string workflowPlaceholder: "" // Custom placeholder text for search bar
     property bool workflowBusy: false  // True while waiting for script response
@@ -53,6 +54,7 @@ Singleton {
     // Signal when workflow produces results
     signal resultsReady(var results)
     signal cardReady(var card)
+    signal formReady(var form)
     signal executeCommand(var command)
     signal workflowClosed()
     signal clearInputRequested()  // Signal to clear the search input
@@ -206,6 +208,7 @@ Singleton {
         };
         root.workflowResults = [];
         root.workflowCard = null;
+        root.workflowForm = null;
         root.workflowPrompt = workflow.manifest.steps?.initial?.prompt ?? "";
         root.workflowPlaceholder = "";  // Reset placeholder on workflow start
         root.workflowError = "";
@@ -263,6 +266,42 @@ Singleton {
         sendToWorkflow(input);
     }
     
+    // Submit form data to active workflow
+    function submitForm(formData) {
+        if (!root.activeWorkflow) return;
+        
+        const input = {
+            step: "form",
+            formData: formData,
+            session: root.activeWorkflow.session
+        };
+        
+        // Include context if set (handler may use it to identify form purpose)
+        if (root.workflowContext) {
+            input.context = root.workflowContext;
+        }
+        
+        sendToWorkflow(input);
+    }
+    
+    // Cancel form and return to previous state
+    function cancelForm() {
+        if (!root.activeWorkflow) return;
+        
+        // Send cancel action to handler - it decides what to do
+        const input = {
+            step: "action",
+            selected: { id: "__form_cancel__" },
+            session: root.activeWorkflow.session
+        };
+        
+        if (root.workflowContext) {
+            input.context = root.workflowContext;
+        }
+        
+        sendToWorkflow(input);
+    }
+    
     // Close active workflow
     // If in replay mode, let the process finish (notification needs to be sent)
     function closeWorkflow() {
@@ -273,6 +312,7 @@ Singleton {
         root.activeWorkflow = null;
         root.workflowResults = [];
         root.workflowCard = null;
+        root.workflowForm = null;
         root.workflowPrompt = "";
         root.workflowPlaceholder = "";
         root.lastSelectedItem = null;
@@ -312,6 +352,7 @@ Singleton {
         };
         root.workflowResults = [];
         root.workflowCard = null;
+        root.workflowForm = null;
         root.workflowPrompt = "";
         root.workflowPlaceholder = "";
         root.workflowError = "";
@@ -387,6 +428,7 @@ Singleton {
             case "results":
                 root.workflowResults = response.results ?? [];
                 root.workflowCard = null;
+                root.workflowForm = null;
                 if (response.placeholder !== undefined) {
                     root.workflowPlaceholder = response.placeholder ?? "";
                 }
@@ -404,6 +446,7 @@ Singleton {
                 
             case "card":
                 root.workflowCard = response.card ?? null;
+                root.workflowForm = null;
                 if (response.placeholder !== undefined) {
                     root.workflowPlaceholder = response.placeholder ?? "";
                 }
@@ -413,6 +456,17 @@ Singleton {
                     root.clearInputRequested();
                 }
                 root.cardReady(root.workflowCard);
+                break;
+                
+            case "form":
+                root.workflowForm = response.form ?? null;
+                root.workflowCard = null;
+                root.workflowResults = [];
+                // Allow handler to set context for form submission handling
+                if (response.context !== undefined) {
+                    root.workflowContext = response.context ?? "";
+                }
+                root.formReady(root.workflowForm);
                 break;
                 
             case "execute":

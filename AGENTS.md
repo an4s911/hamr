@@ -241,10 +241,11 @@ Singleton {
 
 **Input to handler (stdin):**
 ```json
-{"step": "initial|search|action", "query": "...", "selected": {"id": "..."}, "action": "...", "context": "...", "session": "..."}
+{"step": "initial|search|action|form", "query": "...", "selected": {"id": "..."}, "action": "...", "context": "...", "formData": {...}, "session": "..."}
 ```
 
 - `context`: Custom context string set by handler via response (persists across search calls)
+- `formData`: Object containing field values when `step: "form"` (form submission)
 
 **Output from handler (stdout):**
 ```json
@@ -270,6 +271,9 @@ Singleton {
 
 // Open image browser (for image/wallpaper selection)
 {"type": "imageBrowser", "imageBrowser": {"directory": "~/Pictures", "title": "Select Image", "enableOcr": false, "actions": [{"id": "action_id", "name": "Action Name", "icon": "icon"}]}}
+
+// Show form (multi-field input)
+{"type": "form", "form": {"title": "Form Title", "submitLabel": "Save", "cancelLabel": "Cancel", "fields": [...]}, "context": "form_context"}
 
 // Show prompt
 {"type": "prompt", "prompt": {"text": "Enter something..."}}
@@ -569,6 +573,7 @@ def main():
 | `bitwarden/` | `/bitwarden` | entryPoint replay, cache, error cards |
 | `quicklinks/` | `/quicklinks` | Submit mode, context persistence, CRUD |
 | `dict/` | `/dict` | Card response, API fetch |
+| `notes/` | `/notes` | Form API for multi-field input (title + content) |
 | `pictures/` | `/pictures` | Thumbnails, multi-turn navigation |
 | `screenshot/` | `/screenshot` | imageBrowser with `enableOcr: true` |
 | `snippet/` | `/snippet` | Submit mode for text input |
@@ -668,3 +673,178 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+## Form Response Type
+
+The `form` response displays a multi-field input form, replacing the sequential single-line input workflow. This is ideal for creating/editing items with multiple fields (notes, settings, etc.).
+
+### Showing a Form
+
+```python
+print(json.dumps({
+    "type": "form",
+    "form": {
+        "title": "Add New Note",
+        "submitLabel": "Save",      # Optional, defaults to "Submit"
+        "cancelLabel": "Cancel",    # Optional, defaults to "Cancel"
+        "fields": [
+            {
+                "id": "title",
+                "type": "text",
+                "label": "Title",
+                "placeholder": "Enter title...",
+                "required": True,
+                "default": ""
+            },
+            {
+                "id": "content",
+                "type": "textarea",
+                "label": "Content",
+                "placeholder": "Enter content...",
+                "rows": 6,           # Optional, textarea height
+                "default": ""
+            }
+        ]
+    },
+    "context": "__add__"  # Optional: helps handler identify form purpose
+}))
+```
+
+### Field Types
+
+| Type | Description | Properties |
+|------|-------------|------------|
+| `text` | Single-line text input | `placeholder`, `required`, `default`, `hint` |
+| `textarea` | Multi-line text input | `placeholder`, `rows`, `required`, `default`, `hint` |
+| `select` | Dropdown selection | `options: [{id, name}]`, `required`, `default` |
+| `checkbox` | Boolean toggle | `label`, `default` |
+| `password` | Hidden text input | `placeholder`, `required`, `default` |
+
+### Field Properties
+
+```python
+{
+    "id": "field_id",          # Required: unique identifier for this field
+    "type": "text",            # Required: field type
+    "label": "Field Label",    # Optional: shown above field
+    "placeholder": "...",      # Optional: placeholder text
+    "required": True,          # Optional: validation (default: false)
+    "default": "...",          # Optional: initial value
+    "hint": "Help text",       # Optional: shown below field
+    "rows": 6,                 # Optional: textarea height (default: 4)
+    "options": [               # Required for select type
+        {"id": "opt1", "name": "Option 1"},
+        {"id": "opt2", "name": "Option 2"}
+    ]
+}
+```
+
+### Receiving Form Submission
+
+When user submits the form, handler receives:
+
+```python
+{
+    "step": "form",
+    "formData": {
+        "title": "My Note Title",
+        "content": "Line 1\nLine 2\nLine 3",
+        "tags": "work, ideas"
+    },
+    "context": "__add__",
+    "session": "..."
+}
+```
+
+### Handling Form Cancel
+
+When user clicks Cancel, handler receives:
+
+```python
+{
+    "step": "action",
+    "selected": {"id": "__form_cancel__"},
+    "context": "__add__",
+    "session": "..."
+}
+```
+
+### Example: Notes Plugin with Form
+
+```python
+def show_add_form(title_default=""):
+    """Show form for adding a new note"""
+    print(json.dumps({
+        "type": "form",
+        "form": {
+            "title": "Add New Note",
+            "submitLabel": "Save",
+            "fields": [
+                {
+                    "id": "title",
+                    "type": "text",
+                    "label": "Title",
+                    "placeholder": "Enter note title...",
+                    "required": True,
+                    "default": title_default,
+                },
+                {
+                    "id": "content",
+                    "type": "textarea",
+                    "label": "Content",
+                    "placeholder": "Enter note content...\n\nSupports multiple lines.",
+                    "rows": 6,
+                },
+            ],
+        },
+        "context": "__add__",
+    }))
+
+def main():
+    input_data = json.load(sys.stdin)
+    step = input_data.get("step", "initial")
+    context = input_data.get("context", "")
+    form_data = input_data.get("formData", {})
+
+    # Handle form submission
+    if step == "form" and context == "__add__":
+        title = form_data.get("title", "").strip()
+        content = form_data.get("content", "")
+        
+        if title:
+            save_note(title, content)
+            print(json.dumps({
+                "type": "results",
+                "results": get_notes(),
+                "clearInput": True,
+                "context": "",
+            }))
+        else:
+            print(json.dumps({"type": "error", "message": "Title is required"}))
+        return
+
+    # Handle form cancel
+    if step == "action" and selected.get("id") == "__form_cancel__":
+        print(json.dumps({
+            "type": "results",
+            "results": get_notes(),
+            "clearInput": True,
+        }))
+        return
+```
+
+### Keyboard Shortcuts
+
+- **Enter** in text fields: Move to next field
+- **Ctrl+Enter** in textarea: Submit form
+- **Tab**: Move between fields
+- **Escape**: Cancel form (triggers `__form_cancel__`)
+
+### When to Use Forms vs Submit Mode
+
+| Use Form | Use Submit Mode |
+|----------|-----------------|
+| Multiple fields (title + content) | Single text input |
+| Structured data (settings, config) | Free-form search/add |
+| Edit existing items | Quick add by name |
+| Complex input with validation | Simple confirmation |

@@ -2,6 +2,8 @@
 """
 Notes workflow handler - quick notes with CRUD operations.
 Features: list, add, view, edit, delete, copy
+
+Uses the Form API for multi-field input (title + content).
 """
 
 import json
@@ -130,6 +132,72 @@ def respond(response: dict):
     print(json.dumps(response))
 
 
+def show_add_form(title_default: str = "", content_default: str = ""):
+    """Show form for adding a new note"""
+    respond(
+        {
+            "type": "form",
+            "form": {
+                "title": "Add New Note",
+                "submitLabel": "Save",
+                "cancelLabel": "Cancel",
+                "fields": [
+                    {
+                        "id": "title",
+                        "type": "text",
+                        "label": "Title",
+                        "placeholder": "Enter note title...",
+                        "required": True,
+                        "default": title_default,
+                    },
+                    {
+                        "id": "content",
+                        "type": "textarea",
+                        "label": "Content",
+                        "placeholder": "Enter note content...\n\nSupports multiple lines.",
+                        "rows": 6,
+                        "default": content_default,
+                    },
+                ],
+            },
+            "context": "__add__",
+        }
+    )
+
+
+def show_edit_form(note: dict):
+    """Show form for editing an existing note"""
+    respond(
+        {
+            "type": "form",
+            "form": {
+                "title": f"Edit Note",
+                "submitLabel": "Save",
+                "cancelLabel": "Cancel",
+                "fields": [
+                    {
+                        "id": "title",
+                        "type": "text",
+                        "label": "Title",
+                        "placeholder": "Enter note title...",
+                        "required": True,
+                        "default": note.get("title", ""),
+                    },
+                    {
+                        "id": "content",
+                        "type": "textarea",
+                        "label": "Content",
+                        "placeholder": "Enter note content...",
+                        "rows": 6,
+                        "default": note.get("content", ""),
+                    },
+                ],
+            },
+            "context": f"__edit__:{note.get('id', '')}",
+        }
+    )
+
+
 def main():
     input_data = json.load(sys.stdin)
     step = input_data.get("step", "initial")
@@ -137,6 +205,7 @@ def main():
     selected = input_data.get("selected", {})
     action = input_data.get("action", "")
     context = input_data.get("context", "")
+    form_data = input_data.get("formData", {})
 
     notes = load_notes()
 
@@ -152,197 +221,8 @@ def main():
         )
         return
 
-    # ===== SEARCH: Context-dependent search =====
+    # ===== SEARCH: Filter notes =====
     if step == "search":
-        # Add mode - entering title (submit mode)
-        if context == "__add_title__":
-            if query:
-                # Move to content entry
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "clearInput": True,
-                        "context": f"__add_content__:{query}",
-                        "placeholder": "Enter note content (Enter to save)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                            {
-                                "id": "__info__",
-                                "name": f"Title: {query}",
-                                "icon": "title",
-                                "description": "Now enter the note content",
-                            },
-                        ],
-                    }
-                )
-            else:
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "context": "__add_title__",
-                        "placeholder": "Enter note title (Enter to continue)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"}
-                        ],
-                    }
-                )
-            return
-
-        # Add mode - entering content (submit mode)
-        if context.startswith("__add_content__:"):
-            title = context.split(":", 1)[1]
-            if query:
-                # Save the note
-                new_note = {
-                    "id": generate_id(),
-                    "title": title,
-                    "content": query,
-                    "created": int(time.time() * 1000),
-                    "updated": int(time.time() * 1000),
-                }
-                notes.append(new_note)
-                if save_notes(notes):
-                    respond(
-                        {
-                            "type": "results",
-                            "results": get_note_results(notes),
-                            "inputMode": "realtime",
-                            "clearInput": True,
-                            "context": "",
-                            "placeholder": "Search notes or add new...",
-                        }
-                    )
-                else:
-                    respond({"type": "error", "message": "Failed to save note"})
-            else:
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "context": context,
-                        "placeholder": "Enter note content (Enter to save)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                            {
-                                "id": "__info__",
-                                "name": f"Title: {title}",
-                                "icon": "title",
-                                "description": "Type note content above",
-                            },
-                        ],
-                    }
-                )
-            return
-
-        # Edit title mode (submit mode)
-        if context.startswith("__edit_title__:"):
-            note_id = context.split(":", 1)[1]
-            note = next((n for n in notes if n.get("id") == note_id), None)
-            if not note:
-                respond({"type": "error", "message": "Note not found"})
-                return
-
-            if query:
-                # Move to content edit
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "clearInput": True,
-                        "context": f"__edit_content__:{note_id}:{query}",
-                        "placeholder": "Edit note content (Enter to save)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                            {
-                                "id": "__info__",
-                                "name": f"New title: {query}",
-                                "icon": "title",
-                                "description": "Now edit the content",
-                            },
-                            {
-                                "id": "__current__",
-                                "name": f"Current content: {truncate(note.get('content', ''), 40)}",
-                                "icon": "notes",
-                            },
-                        ],
-                    }
-                )
-            else:
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "context": context,
-                        "placeholder": "Edit note title (Enter to continue)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                            {
-                                "id": "__current__",
-                                "name": f"Current: {note.get('title', '')}",
-                                "icon": "info",
-                                "description": "Type new title above",
-                            },
-                        ],
-                    }
-                )
-            return
-
-        # Edit content mode (submit mode)
-        if context.startswith("__edit_content__:"):
-            parts = context.split(":", 2)
-            note_id = parts[1]
-            new_title = parts[2] if len(parts) > 2 else ""
-            note = next((n for n in notes if n.get("id") == note_id), None)
-            if not note:
-                respond({"type": "error", "message": "Note not found"})
-                return
-
-            if query:
-                # Save edits
-                note["title"] = new_title
-                note["content"] = query
-                note["updated"] = int(time.time() * 1000)
-                if save_notes(notes):
-                    respond(
-                        {
-                            "type": "results",
-                            "results": get_note_results(notes),
-                            "inputMode": "realtime",
-                            "clearInput": True,
-                            "context": "",
-                            "placeholder": "Search notes or add new...",
-                        }
-                    )
-                else:
-                    respond({"type": "error", "message": "Failed to save note"})
-            else:
-                respond(
-                    {
-                        "type": "results",
-                        "inputMode": "submit",
-                        "context": context,
-                        "placeholder": "Edit note content (Enter to save)",
-                        "results": [
-                            {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                            {
-                                "id": "__info__",
-                                "name": f"Title: {new_title}",
-                                "icon": "title",
-                            },
-                            {
-                                "id": "__current__",
-                                "name": f"Current: {truncate(note.get('content', ''), 40)}",
-                                "icon": "info",
-                                "description": "Type new content above",
-                            },
-                        ],
-                    }
-                )
-            return
-
-        # Normal search: filter notes
         filtered = filter_notes(query, notes)
         results = []
 
@@ -369,12 +249,78 @@ def main():
         )
         return
 
+    # ===== FORM: Handle form submission =====
+    if step == "form":
+        # Adding new note
+        if context == "__add__":
+            title = form_data.get("title", "").strip()
+            content = form_data.get("content", "")
+
+            if title:
+                new_note = {
+                    "id": generate_id(),
+                    "title": title,
+                    "content": content,
+                    "created": int(time.time() * 1000),
+                    "updated": int(time.time() * 1000),
+                }
+                notes.append(new_note)
+                if save_notes(notes):
+                    respond(
+                        {
+                            "type": "results",
+                            "results": get_note_results(notes),
+                            "inputMode": "realtime",
+                            "clearInput": True,
+                            "context": "",
+                            "placeholder": "Search notes or add new...",
+                        }
+                    )
+                else:
+                    respond({"type": "error", "message": "Failed to save note"})
+            else:
+                respond({"type": "error", "message": "Title is required"})
+            return
+
+        # Editing existing note
+        if context.startswith("__edit__:"):
+            note_id = context.split(":", 1)[1]
+            note = next((n for n in notes if n.get("id") == note_id), None)
+
+            if not note:
+                respond({"type": "error", "message": "Note not found"})
+                return
+
+            title = form_data.get("title", "").strip()
+            content = form_data.get("content", "")
+
+            if title:
+                note["title"] = title
+                note["content"] = content
+                note["updated"] = int(time.time() * 1000)
+                if save_notes(notes):
+                    respond(
+                        {
+                            "type": "results",
+                            "results": get_note_results(notes),
+                            "inputMode": "realtime",
+                            "clearInput": True,
+                            "context": "",
+                            "placeholder": "Search notes or add new...",
+                        }
+                    )
+                else:
+                    respond({"type": "error", "message": "Failed to save note"})
+            else:
+                respond({"type": "error", "message": "Title is required"})
+            return
+
     # ===== ACTION: Handle clicks =====
     if step == "action":
         item_id = selected.get("id", "")
 
-        # Back navigation
-        if item_id == "__back__":
+        # Form cancelled - return to list
+        if item_id == "__form_cancel__":
             respond(
                 {
                     "type": "results",
@@ -391,49 +337,15 @@ def main():
         if item_id in ("__info__", "__current__", "__empty__"):
             return
 
-        # Start adding new note
+        # Start adding new note - show form
         if item_id == "__add__":
-            respond(
-                {
-                    "type": "results",
-                    "inputMode": "submit",
-                    "clearInput": True,
-                    "context": "__add_title__",
-                    "placeholder": "Enter note title (Enter to continue)",
-                    "results": [
-                        {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                        {
-                            "id": "__info__",
-                            "name": "Step 1: Enter a title",
-                            "icon": "title",
-                            "description": "Then you'll add the content",
-                        },
-                    ],
-                }
-            )
+            show_add_form()
             return
 
-        # Quick add from search
+        # Quick add from search - show form with title prefilled
         if item_id.startswith("__add_quick__:"):
             title = item_id.split(":", 1)[1]
-            respond(
-                {
-                    "type": "results",
-                    "inputMode": "submit",
-                    "clearInput": True,
-                    "context": f"__add_content__:{title}",
-                    "placeholder": "Enter note content (Enter to save)",
-                    "results": [
-                        {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                        {
-                            "id": "__info__",
-                            "name": f"Title: {title}",
-                            "icon": "title",
-                            "description": "Now enter the note content",
-                        },
-                    ],
-                }
-            )
+            show_add_form(title_default=title)
             return
 
         # Find the note
@@ -462,26 +374,9 @@ def main():
             )
             return
 
-        # Edit action
+        # Edit action - show form
         if action == "edit":
-            respond(
-                {
-                    "type": "results",
-                    "inputMode": "submit",
-                    "clearInput": True,
-                    "context": f"__edit_title__:{item_id}",
-                    "placeholder": "Edit note title (Enter to continue)",
-                    "results": [
-                        {"id": "__back__", "name": "Cancel", "icon": "arrow_back"},
-                        {
-                            "id": "__current__",
-                            "name": f"Current: {note.get('title', '')}",
-                            "icon": "info",
-                            "description": "Type new title above",
-                        },
-                    ],
-                }
-            )
+            show_edit_form(note)
             return
 
         # Copy action

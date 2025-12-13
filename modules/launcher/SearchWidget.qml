@@ -17,6 +17,7 @@ Item { // Wrapper
     property string searchingText: LauncherSearch.query
     property bool showResults: searchingText != "" || LauncherSearch.results.length > 0
     property bool showCard: WorkflowRunner.workflowCard !== null
+    property bool showForm: WorkflowRunner.workflowForm !== null
     // Include the full visual height (content + offset)
     implicitWidth: searchWidgetContent.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: searchWidgetContent.implicitHeight + searchWidgetContent.anchors.topMargin + Appearance.sizes.elevationMargin * 2
@@ -276,7 +277,7 @@ Item { // Wrapper
 
             Rectangle {
                 // Separator
-                visible: root.showResults || root.showCard || WorkflowRunner.workflowBusy
+                visible: root.showResults || root.showCard || root.showForm || WorkflowRunner.workflowBusy
                 Layout.fillWidth: true
                 height: 1
                 color: Appearance.colors.colOutlineVariant
@@ -334,10 +335,34 @@ Item { // Wrapper
                 }
             }
 
+            // Workflow form display (shown when form response received)
+            WorkflowForm {
+                id: workflowFormView
+                visible: root.showForm
+                Layout.fillWidth: true
+                Layout.leftMargin: 6
+                Layout.rightMargin: 6
+                Layout.bottomMargin: 6
+                
+                form: WorkflowRunner.workflowForm
+                
+                onSubmitted: formData => {
+                    WorkflowRunner.submitForm(formData);
+                    // Return focus to search bar after form submission
+                    root.focusSearchInput();
+                }
+                
+                onCancelled: {
+                    WorkflowRunner.cancelForm();
+                    // Return focus to search bar after form cancel
+                    root.focusSearchInput();
+                }
+            }
+
             // Results container with recessed background
             Rectangle {
                 id: resultsContainer
-                visible: root.showResults && !root.showCard && !WorkflowRunner.workflowBusy
+                visible: root.showResults && !root.showCard && !root.showForm && !WorkflowRunner.workflowBusy
                 Layout.fillWidth: true
                 Layout.leftMargin: 6
                 Layout.rightMargin: 6
