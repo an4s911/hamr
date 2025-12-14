@@ -96,15 +96,63 @@ cp -r hamr ~/.config/quickshell/hamr
 mkdir -p ~/.config/hamr
 ln -s ~/.config/quickshell/hamr/plugins ~/.config/hamr/plugins
 
-# 3. Add Hyprland keybinding (~/.config/hypr/hyprland.conf)
-# bind = Super, Super_L, global, quickshell:hamrToggle
-
-# 4. Start Quickshell
+# 3. Start Quickshell (runs in background, launcher is hidden by default)
 qs -c hamr
-
-# 5. (Optional) Auto-start with Hyprland (~/.config/hypr/hyprland.conf)
-# exec-once = qs -c hamr
 ```
+
+**4. Add Hyprland keybinding (required)**
+
+Hamr starts hidden and listens for a toggle signal. Add this to `~/.config/hypr/hyprland.conf`:
+
+```bash
+# Toggle Hamr with Super key (tap and release)
+bind = Super, Super_L, global, quickshell:hamrToggle
+
+# Or use Ctrl+Space instead
+# bind = Ctrl, Space, global, quickshell:hamrToggle
+```
+
+After adding the keybinding, reload Hyprland (`hyprctl reload`) and press your keybind to open Hamr.
+
+**5. (Optional) Auto-start with Hyprland**
+
+Add to `~/.config/hypr/hyprland.conf`:
+```bash
+exec-once = qs -c hamr
+```
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+**"I ran `qs -c hamr` but nothing appears"**
+
+This is expected. Hamr starts hidden and waits for a toggle signal. Make sure you:
+1. Added the keybinding to `~/.config/hypr/hyprland.conf` (see step 4 above)
+2. Reloaded Hyprland config: `hyprctl reload`
+3. Press your keybind (e.g., Super key or Ctrl+Space)
+
+**Warning about missing `colors.json`**
+
+```
+WARN: Read of colors.json failed: File does not exist
+```
+
+This is harmless. Hamr looks for Material theme colors from [illogical-impulse](https://github.com/end-4/dots-hyprland). Without it, Hamr uses built-in default colors.
+
+**Warning about missing `quicklinks.json`**
+
+```
+WARN: Read of quicklinks.json failed: File does not exist
+```
+
+This is harmless. Quicklinks are optional. To add quicklinks, create `~/.config/hamr/quicklinks.json`:
+```json
+[
+  {"name": "GitHub", "url": "https://github.com", "icon": "code"}
+]
+```
+
+</details>
 
 <details>
 <summary><strong>Clipboard Support (Optional)</strong></summary>
