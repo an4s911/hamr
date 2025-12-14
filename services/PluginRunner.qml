@@ -43,6 +43,15 @@ Singleton {
     // Handler controls this via response - allows different modes per step
     property string inputMode: "realtime"
     
+    // Polling: interval in ms (0 = disabled)
+    // Can be set via manifest.json "poll" field or response "pollInterval" field
+    property int pollInterval: 0
+    property string lastPollQuery: ""  // Last query sent to plugin (for poll context)
+    
+    // Flag to indicate the next result update is from a poll (not user action)
+    // This is set before sending poll request and cleared after results are processed
+    property bool isPollUpdate: false
+    
     
      // Replay mode: when true, plugin is running a replay action (no UI needed)
      // Process should complete even if launcher closes
@@ -216,6 +225,8 @@ Singleton {
          root.pluginPlaceholder = "";  // Reset placeholder on plugin start
          root.pluginError = "";
          root.inputMode = "realtime";  // Default to realtime, handler can change
+         root.pollInterval = plugin.manifest.poll ?? 0;  // Poll interval from manifest
+         root.lastPollQuery = "";
          
          sendToPlugin({ step: "initial", session: session });
          return true;
@@ -227,6 +238,9 @@ Singleton {
              console.log("[PluginRunner] sendToPlugin: No active plugin");
              return;
          }
+         
+         // Track last query for poll context
+         root.lastPollQuery = query;
          
          // Don't clear card here - it should persist until new response arrives
          
@@ -323,6 +337,8 @@ Singleton {
          root.pluginError = "";
          root.pluginBusy = false;
          root.inputMode = "realtime";
+         root.pollInterval = 0;
+         root.lastPollQuery = "";
          root.pluginClosed();
      }
      
@@ -441,6 +457,10 @@ Singleton {
                  }
                  // Set input mode from response (defaults to realtime)
                  root.inputMode = response.inputMode ?? "realtime";
+                 // Allow handler to override poll interval dynamically
+                 if (response.pollInterval !== undefined) {
+                     root.pollInterval = response.pollInterval ?? 0;
+                 }
                  if (response.clearInput) {
                      root.clearInputRequested();
                  }
@@ -571,6 +591,31 @@ Singleton {
                  },
                  session: root.activePlugin.session
              });
+         }
+     }
+     
+     // Polling timer - periodically refreshes plugin results
+     Timer {
+         id: pollTimer
+         interval: root.pollInterval
+         running: root.activePlugin !== null && root.pollInterval > 0 && !root.pluginBusy
+         repeat: true
+         onTriggered: {
+             if (root.activePlugin && !root.pluginBusy) {
+                 root.isPollUpdate = true;
+                 const input = {
+                     step: "poll",
+                     query: root.lastPollQuery,
+                     session: root.activePlugin.session
+                 };
+                 if (root.lastSelectedItem) {
+                     input.selected = { id: root.lastSelectedItem };
+                 }
+                 if (root.pluginContext) {
+                     input.context = root.pluginContext;
+                 }
+                 sendToPlugin(input);
+             }
          }
      }
      

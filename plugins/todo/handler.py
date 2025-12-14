@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # Test mode - skip external tool calls
@@ -20,18 +21,23 @@ TODO_FILE = STATE_DIR / "quickshell" / "user" / "todo.json"
 
 
 def load_todos() -> list[dict]:
-    """Load todos from file"""
+    """Load todos from file, sorted by creation date (newest first)"""
     if not TODO_FILE.exists():
         return []
     try:
         with open(TODO_FILE) as f:
-            return json.load(f)
+            todos = json.load(f)
+            # Sort by created timestamp (newest first), fallback to 0 for old items
+            todos.sort(key=lambda x: x.get("created", 0), reverse=True)
+            return todos
     except (json.JSONDecodeError, IOError):
         return []
 
 
 def save_todos(todos: list[dict]) -> None:
-    """Save todos to file"""
+    """Save todos to file (sorted by creation date, newest first)"""
+    # Sort before saving to maintain consistent order
+    todos.sort(key=lambda x: x.get("created", 0), reverse=True)
     TODO_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(TODO_FILE, "w") as f:
         json.dump(todos, f)
@@ -143,17 +149,25 @@ def main():
         # Add mode (submit mode)
         # In submit mode, Enter should perform the action directly (single press).
         if context == "__add_mode__":
+            # Only add when query is provided (user pressed Enter in submit mode)
             if query:
-                todos.append({"content": query, "done": False})
+                todos.append(
+                    {
+                        "content": query,
+                        "done": False,
+                        "created": int(time.time() * 1000),
+                    }
+                )
                 save_todos(todos)
                 respond(get_todo_results(todos), refresh_ui=True, clear_input=True)
-            else:
-                respond(
-                    [{"id": "__back__", "name": "Cancel", "icon": "arrow_back"}],
-                    placeholder="Type new task... (Enter to add)",
-                    context="__add_mode__",
-                    input_mode="submit",
-                )
+                return
+            # Empty query - stay in add mode (shouldn't happen in submit mode, but handle it)
+            respond(
+                [{"id": "__back__", "name": "Cancel", "icon": "arrow_back"}],
+                placeholder="Type new task... (Enter to add)",
+                context="__add_mode__",
+                input_mode="submit",
+            )
             return
 
         # Edit mode (submit mode)
@@ -258,7 +272,13 @@ def main():
             if encoded:
                 try:
                     task_content = base64.b64decode(encoded).decode()
-                    todos.append({"content": task_content, "done": False})
+                    todos.append(
+                        {
+                            "content": task_content,
+                            "done": False,
+                            "created": int(time.time() * 1000),
+                        }
+                    )
                     save_todos(todos)
                     respond(get_todo_results(todos), refresh_ui=True, clear_input=True)
                     return

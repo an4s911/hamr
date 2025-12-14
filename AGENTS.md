@@ -263,8 +263,10 @@ Singleton {
 
 **Input to handler (stdin):**
 ```json
-{"step": "initial|search|action|form", "query": "...", "selected": {"id": "..."}, "action": "...", "context": "...", "formData": {...}, "session": "..."}
+{"step": "initial|search|action|form|poll", "query": "...", "selected": {"id": "..."}, "action": "...", "context": "...", "formData": {...}, "session": "..."}
 ```
+
+- `step: "poll"`: Periodic refresh request (only sent if `poll` is set in manifest or response)
 
 - `context`: Custom context string set by handler via response (persists across search calls)
 - `formData`: Object containing field values when `step: "form"` (form submission)
@@ -366,6 +368,55 @@ if step == "search" and context == "chat":
 - Submit: "Type your message... (Enter to send)"
 
 **Key insight for submit mode:** When user presses Enter, execute the action directly in the `step: "search"` handler - don't return results that require another Enter press. Single Enter = action executed.
+
+### Polling (Auto-Refresh)
+
+For plugins that need periodic updates (e.g., process monitors, system stats), use the polling API:
+
+**1. Set poll interval in manifest.json:**
+```json
+{
+  "name": "Top CPU",
+  "description": "Processes sorted by CPU usage",
+  "icon": "speed",
+  "poll": 2000
+}
+```
+
+**2. Handle the `poll` step in your handler:**
+```python
+# Poll: refresh with current query (called periodically by PluginRunner)
+if step == "poll":
+    processes = get_processes()
+    print(json.dumps({
+        "type": "results",
+        "results": get_process_results(processes, query),
+    }))
+    return
+```
+
+**Polling behavior:**
+- Timer only runs when plugin is active and not busy (waiting for response)
+- `step: "poll"` is sent with the last `query` for filtering context
+- Handler should return same format as `search` step
+- Can be disabled dynamically via response: `"pollInterval": 0`
+
+**Dynamic poll interval:** Override from response to enable/disable polling:
+```python
+# Start polling (e.g., after entering monitoring mode)
+print(json.dumps({
+    "type": "results",
+    "results": [...],
+    "pollInterval": 1000  # Enable 1s polling
+}))
+
+# Stop polling (e.g., when showing detail view)
+print(json.dumps({
+    "type": "results",
+    "results": [...],
+    "pollInterval": 0  # Disable polling
+}))
+```
 
 ### Multi-Turn Flow
 1. User clicks item → `selectItem(id, action)` → handler receives `step: "action"`
@@ -601,6 +652,8 @@ def main():
 | `snippet/` | `/snippet` | Submit mode for text input |
 | `todo/` | `/todo` | Submit mode, IPC refresh, CRUD |
 | `wallpaper/` | `/wallpaper` | imageBrowser, history tracking |
+| `topcpu/` | `/topcpu` | Polling API, process management |
+| `topmem/` | `/topmem` | Polling API, process management |
 
 ## Image Browser Response Type
 

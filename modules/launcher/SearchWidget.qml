@@ -416,13 +416,57 @@ Item { // Wrapper
                     }
                 }
 
+                // Track selected item key and action index for poll update restoration
+                property string selectedItemKey: ""
+                property int selectedActionIndex: -1
+                
+                // Update selected key when selection changes
+                onCurrentIndexChanged: {
+                    if (currentIndex >= 0 && currentIndex < LauncherSearch.results.length) {
+                        selectedItemKey = LauncherSearch.results[currentIndex]?.key ?? "";
+                    } else {
+                        selectedItemKey = "";
+                    }
+                }
+                
+                // Track action index changes from current item
+                function updateActionIndex(index) {
+                    selectedActionIndex = index;
+                }
+                
                 model: ScriptModel {
                     id: model
                     objectProp: "key"
                     values: LauncherSearch.results
                     onValuesChanged: {
-                        // Reset index before model updates to prevent out-of-range errors
+                        // Only preserve selection during poll updates (not user search/actions)
+                        if (PluginRunner.isPollUpdate) {
+                            PluginRunner.isPollUpdate = false;  // Clear flag after processing
+                            
+                            const savedKey = appResults.selectedItemKey;
+                            const savedActionIndex = appResults.selectedActionIndex;
+                            
+                            if (savedKey) {
+                                const newIndex = LauncherSearch.results.findIndex(r => r.key === savedKey);
+                                if (newIndex >= 0) {
+                                    appResults.currentIndex = newIndex;
+                                    // Restore action focus after delegate is ready
+                                    if (savedActionIndex >= 0) {
+                                        Qt.callLater(() => {
+                                            const currentItem = appResults.itemAtIndex(appResults.currentIndex);
+                                            if (currentItem) {
+                                                currentItem.focusedActionIndex = savedActionIndex;
+                                            }
+                                        });
+                                    }
+                                    return;  // Selection preserved
+                                }
+                            }
+                        }
+                        
+                        // Normal update (not poll) or item not found - reset to first
                         appResults.currentIndex = -1;
+                        appResults.selectedActionIndex = -1;
                         if (LauncherSearch.skipNextAutoFocus) {
                             LauncherSearch.skipNextAutoFocus = false;
                             return;

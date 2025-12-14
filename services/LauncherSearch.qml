@@ -206,6 +206,7 @@ Singleton {
             }
             
             return resultComp.createObject(null, {
+                id: itemId,  // Set id for stable key in ScriptModel
                 name: item.name,
                 comment: item.description ?? "",
                 verb: item.verb ?? "Select",
@@ -1169,7 +1170,8 @@ Singleton {
         id: pluginSearchTimer
         interval: 150
         onTriggered: {
-            if (PluginRunner.isActive()) {
+            // Double-check inputMode in case it changed while timer was running
+            if (PluginRunner.isActive() && PluginRunner.inputMode === "realtime") {
                 PluginRunner.search(root.query);
             }
         }

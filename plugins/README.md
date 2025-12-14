@@ -288,6 +288,69 @@ Display an error message.
 
 ---
 
+## Polling (Auto-Refresh)
+
+For plugins that need periodic updates (e.g., process monitors, system stats), use the polling API.
+
+### Enable Polling in manifest.json
+
+```json
+{
+  "name": "Top CPU",
+  "description": "Processes sorted by CPU usage",
+  "icon": "speed",
+  "poll": 2000
+}
+```
+
+The `poll` field is the interval in milliseconds (e.g., `2000` = refresh every 2 seconds).
+
+### Handle the `poll` Step
+
+```python
+# Poll: refresh with current query (called periodically by PluginRunner)
+if step == "poll":
+    processes = get_processes()
+    print(json.dumps({
+        "type": "results",
+        "results": get_process_results(processes, query),
+    }))
+    return
+```
+
+### Polling Behavior
+
+| Aspect | Behavior |
+|--------|----------|
+| **When runs** | Only when plugin is active and not busy |
+| **Input** | `step: "poll"` with last `query` for filtering |
+| **Output** | Same format as `search` step |
+| **Dynamic control** | Override with `pollInterval` in response |
+
+### Dynamic Poll Interval
+
+Override polling from response (enable/disable dynamically):
+
+```python
+# Start polling (e.g., after entering monitoring mode)
+print(json.dumps({
+    "type": "results",
+    "results": [...],
+    "pollInterval": 1000  # Enable 1s polling
+}))
+
+# Stop polling (e.g., when showing detail view)
+print(json.dumps({
+    "type": "results",
+    "results": [...],
+    "pollInterval": 0  # Disable polling
+}))
+```
+
+**Example plugins:** [`topcpu/`](topcpu/handler.py), [`topmem/`](topmem/handler.py)
+
+---
+
 ## Input Modes
 
 The `inputMode` field controls when search queries are sent to your handler:
@@ -632,6 +695,8 @@ For desktop application icons from `.desktop` files, set `"iconType": "system"`:
 | [`todo/`](todo/)                   | `/todo`          | Todo list                           | Submit mode, IPC refresh, CRUD          |
 | [`wallpaper/`](wallpaper/)         | `/wallpaper`     | Wallpaper selector                  | imageBrowser, history tracking          |
 | [`create-plugin/`](create-plugin/) | `/create-plugin` | AI plugin creator                   | OpenCode integration                    |
+| [`topcpu/`](topcpu/)               | `/topcpu`        | Process monitor (CPU)               | Polling API, process management         |
+| [`topmem/`](topmem/)               | `/topmem`        | Process monitor (memory)            | Polling API, process management         |
 
 ---
 

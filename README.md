@@ -65,6 +65,8 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 | `todo` | `/todo` | Simple todo list manager |
 | `wallpaper` | `/wallpaper` | Wallpaper selector (illogical-impulse) |
 | `create-plugin` | `/create-plugin` | AI helper to create new plugins (requires [OpenCode](https://opencode.ai)) |
+| `topcpu` | `/topcpu` | Process monitor sorted by CPU usage (auto-refresh) |
+| `topmem` | `/topmem` | Process monitor sorted by memory usage (auto-refresh) |
 
 ### Simple Actions (Scripts)
 
@@ -304,6 +306,7 @@ Plugins live in `~/.config/hamr/plugins/`. Each plugin is either:
 | **Custom placeholders** | Change search bar placeholder text per step |
 | **Live search** | Filter results as user types |
 | **Submit mode** | Wait for Enter before processing (for text input, chat) |
+| **Auto-refresh polling** | Periodic updates for live data (process monitors, stats) |
 
 <details>
 <summary><strong>Quick Start: Hello World Plugin</strong></summary>
@@ -462,6 +465,20 @@ Field types: `text`, `textarea`, `select`, `checkbox`, `password`. Keyboard: `Es
 | `submit` | Search only on Enter | Text input, AI chat, adding items |
 
 Set `"inputMode": "submit"` in results/card response to wait for Enter.
+
+#### Polling (Auto-Refresh)
+
+For live data (process monitors, stats), enable polling in `manifest.json`:
+
+```json
+{
+  "name": "Top CPU",
+  "icon": "speed",
+  "poll": 2000
+}
+```
+
+Handle `step: "poll"` in your handler (same format as `search`). Disable dynamically with `"pollInterval": 0` in response.
 
 </details>
 

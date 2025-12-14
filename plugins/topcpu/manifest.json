@@ -1,0 +1,6 @@
+{
+  "name": "Top CPU",
+  "description": "Processes sorted by CPU usage",
+  "icon": "speed",
+  "poll": 2000
+}

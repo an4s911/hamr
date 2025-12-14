@@ -55,6 +55,13 @@ RippleButton {
     // Action focus: -1 = main item focused, 0+ = action button index
     property int focusedActionIndex: -1
     
+    // Notify parent ListView when action index changes (for poll update restoration)
+    onFocusedActionIndexChanged: {
+        if (ListView.view && typeof ListView.view.updateActionIndex === "function") {
+            ListView.view.updateActionIndex(focusedActionIndex);
+        }
+    }
+    
     function cycleActionNext() {
         const actions = root.entry.actions ?? [];
         if (actions.length === 0) return;
@@ -94,8 +101,9 @@ RippleButton {
         }
     }
     
-    // Reset action focus when item changes or loses list selection
-    onEntryChanged: root.focusedActionIndex = -1
+    // Reset action focus when losing list selection
+    // Note: We don't reset on entryChanged because during poll updates,
+    // the entry data changes but we want to preserve action focus
     ListView.onIsCurrentItemChanged: {
         if (!ListView.isCurrentItem) {
             root.focusedActionIndex = -1;

@@ -1,0 +1,6 @@
+{
+  "name": "Top Memory",
+  "description": "Processes sorted by memory usage",
+  "icon": "memory",
+  "poll": 2000
+}
