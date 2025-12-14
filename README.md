@@ -6,9 +6,17 @@ Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quic
 
 ## Screenshots
 
-| Overview | Plugins |
-|----------|---------|
-| ![Hamr Overview](assets/screenshots/hamr-overview.png) | ![Hamr Plugins](assets/screenshots/hamr-plugins.png) |
+![Hamr Overview](assets/screenshots/hamr-overview.png)
+**Recent history at your fingertips** - Open Hamr to see your most-used plugins, shell commands, and actions ranked by frecency. Wallpaper thumbnails show exactly which wallpaper you set last time.
+
+![Hamr App Search](assets/screenshots/hamr-app-search.png)
+**Unified search across everything** - Apps, emojis, and more in one place. Fuzzy matching highlights what you're looking for, with app descriptions and running window indicators.
+
+![Hamr Plugins](assets/screenshots/hamr-plugins.png)
+**Extensible plugin system** - Type `/` to browse all available plugins. From Bitwarden passwords to AI-powered plugin creation, each plugin is a simple Python script.
+
+![Hamr Clipboard](assets/screenshots/hamr-clipboard.png)
+**Clipboard history with image previews** - Type `;` to search your clipboard history. Images show thumbnails, and each entry has quick copy/delete actions.
 
 ## Compatibility
 
