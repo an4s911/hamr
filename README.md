@@ -36,6 +36,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 - **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort), includes desktop entry keywords (e.g., "whatsapp" finds ZapZap)
 - **Extensible plugins** - Python handlers with simple JSON protocol
 - **History tracking** - Search, plugin actions, and shell command history
+- **Draggable & persistent position** - Drag the launcher anywhere on screen; position remembered across sessions
 
 ### Prefix Shortcuts
 

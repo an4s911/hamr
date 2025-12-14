@@ -154,6 +154,13 @@ Singleton {
                     property list<var> laps: []
                 }
             }
+
+            property JsonObject launcher: JsonObject {
+                // Position as ratio of screen size (0.0-1.0) for resolution independence
+                // 0.5 = centered horizontally, 0.1 = 10% from top
+                property real xRatio: 0.5
+                property real yRatio: 0.1
+            }
         }
     }
 }

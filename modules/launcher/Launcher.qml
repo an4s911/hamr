@@ -153,12 +153,11 @@ Scope {
                     anchors.fill: parent
                     visible: GlobalStates.launcherOpen
                     onClicked: (mouse) => {
-                        // Check if click is outside the search widget content
-                        const content = searchWidget.contentItem;
-                        const mapped = content.mapToItem(fullScreenBackground, 0, 0);
+                        // Check if click is outside the search widget bounds
+                        const widgetMapped = columnLayout.mapToItem(fullScreenBackground, 0, 0);
 
-                        if (mouse.x < mapped.x || mouse.x > mapped.x + content.width ||
-                            mouse.y < mapped.y || mouse.y > mapped.y + content.height) {
+                        if (mouse.x < widgetMapped.x || mouse.x > widgetMapped.x + columnLayout.width ||
+                            mouse.y < widgetMapped.y || mouse.y > widgetMapped.y + columnLayout.height) {
                             // Click is outside - close
                             if (PluginRunner.isActive()) {
                                 LauncherSearch.closePlugin();
@@ -169,14 +168,19 @@ Scope {
                 }
             }
 
-            Column {
+            Item {
                 id: columnLayout
                 visible: GlobalStates.launcherOpen
-                anchors {
-                    horizontalCenter: parent.horizontalCenter
-                    top: parent.top
-                }
-                spacing: -8
+                
+                // Track if we're dragging to avoid binding loop
+                property bool isDragging: false
+                
+                // Calculate position from stored ratios (only when not dragging)
+                x: isDragging ? x : Persistent.states.launcher.xRatio * fullScreenBackground.width - width / 2
+                y: isDragging ? y : Persistent.states.launcher.yRatio * fullScreenBackground.height
+                
+                implicitWidth: searchWidget.implicitWidth
+                implicitHeight: searchWidget.implicitHeight
 
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Escape) {
@@ -188,6 +192,67 @@ Scope {
                         } else {
                             GlobalStates.launcherOpen = false;
                         }
+                    }
+                }
+
+                // Drag handle overlay at top of search widget
+                MouseArea {
+                    id: dragArea
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                    }
+                    height: 40 + Appearance.sizes.elevationMargin * 20 // Cover top margin + some of the search bar
+                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    
+                    // Use offset from item origin to maintain relative position during drag
+                    property real offsetX: 0
+                    property real offsetY: 0
+                    
+                    onPressed: mouse => {
+                        columnLayout.isDragging = true;
+                        // Calculate offset from mouse position to item origin
+                        const globalPos = mapToItem(fullScreenBackground, mouse.x, mouse.y);
+                        offsetX = globalPos.x - columnLayout.x;
+                        offsetY = globalPos.y - columnLayout.y;
+                    }
+                    
+                    onPositionChanged: mouse => {
+                        if (pressed) {
+                            // Convert mouse position to screen coordinates
+                            const globalPos = mapToItem(fullScreenBackground, mouse.x, mouse.y);
+                            let newX = globalPos.x - offsetX;
+                            let newY = globalPos.y - offsetY;
+                            
+                            // Clamp to keep widget visible on screen
+                            // Allow negative y to account for top margin in SearchWidget
+                            const screenW = fullScreenBackground.width;
+                            const screenH = fullScreenBackground.height;
+                            const topMargin = Appearance.sizes.elevationMargin * 20;
+                            newX = Math.max(0, Math.min(newX, screenW - columnLayout.width));
+                            newY = Math.max(-topMargin, Math.min(newY, screenH - columnLayout.height));
+                            
+                            columnLayout.x = newX;
+                            columnLayout.y = newY;
+                        }
+                    }
+                    
+                    onReleased: {
+                        // Save position as ratio for resolution independence
+                        const screenW = fullScreenBackground.width;
+                        const screenH = fullScreenBackground.height;
+                        let xRatio = (columnLayout.x + columnLayout.width / 2) / screenW;
+                        let yRatio = columnLayout.y / screenH;
+                        
+                        // Clamp ratios to keep widget on screen (0.0-1.0)
+                        xRatio = Math.max(0.0, Math.min(1.0, xRatio));
+                        yRatio = Math.max(0.0, Math.min(1.0, yRatio));
+                        
+                        Persistent.states.launcher.xRatio = xRatio;
+                        Persistent.states.launcher.yRatio = yRatio;
+                        
+                        columnLayout.isDragging = false;
                     }
                 }
 
