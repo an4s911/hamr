@@ -1288,6 +1288,96 @@ Singleton {
             return root.pluginResultsToSearchResults(_pluginResults);
         }
         
+        ////////////////// Exclusive mode - check BEFORE empty query //////////////////
+        // This ensures exclusive modes (/, :, =) are handled even when query is cleared
+        
+        // Actions/Plugins in exclusive mode - show only actions and plugins
+        if (root.exclusiveMode === "action") {
+            const searchString = root.query.split(" ")[0];
+            const actionArgs = root.query.split(" ").slice(1).join(" ");
+            
+            // Get actions
+            const actionMatches = searchString === "" 
+                ? root.allActions.slice(0, 20)
+                : Fuzzy.go(searchString, root.preppedActions, { key: "name", limit: 20 }).map(r => r.obj.action);
+            
+            const actionItems = actionMatches.map(action => {
+                const hasArgs = actionArgs.length > 0;
+                return resultComp.createObject(null, {
+                    name: action.action + (hasArgs ? " " + actionArgs : ""),
+                    verb: "Run",
+                    type: "Action",
+                    iconName: 'settings_suggest',
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => {
+                        root.recordSearch("action", action.action, root.query);
+                        action.execute(actionArgs);
+                    }
+                });
+            });
+            
+            // Get plugins
+            const pluginMatches = searchString === ""
+                ? PluginRunner.plugins.slice(0, 20)
+                : Fuzzy.go(searchString, root.preppedPlugins, { key: "name", limit: 20 }).map(r => r.obj.plugin);
+            
+            const pluginItems = pluginMatches.map(plugin => {
+                return resultComp.createObject(null, {
+                    name: plugin.manifest?.name || plugin.id,
+                    comment: plugin.manifest?.description || "",
+                    verb: "Open",
+                    type: "Plugin",
+                    iconName: plugin.manifest?.icon || 'extension',
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => {
+                        root.recordSearch("workflow", plugin.id, root.query);
+                        root.startPlugin(plugin.id);
+                    }
+                });
+            });
+            
+            return [...pluginItems, ...actionItems].filter(Boolean);
+        }
+        
+        // Emojis in exclusive mode - show full emoji results
+        if (root.exclusiveMode === "emoji") {
+            const searchString = root.query;
+            return Emojis.fuzzyQuery(searchString).map(entry => {
+                const emoji = entry.match(/^\s*(\S+)/)?.[1] || "";
+                return resultComp.createObject(null, {
+                    rawValue: entry,
+                    name: entry.replace(/^\s*\S+\s+/, ""),
+                    iconName: emoji,
+                    iconType: LauncherSearchResult.IconType.Text,
+                    verb: "Copy",
+                    type: "Emoji",
+                    execute: () => {
+                        Quickshell.clipboardText = entry.match(/^\s*(\S+)/)?.[1];
+                    }
+                });
+            }).filter(Boolean);
+        }
+        
+        // Math in exclusive mode - show only math result
+        if (root.exclusiveMode === "math") {
+            // Trigger math calculation
+            nonAppResultsTimer.restart();
+            
+            // Use the query directly as math expression
+            if (root.mathResult && root.mathResult !== root.query) {
+                return [resultComp.createObject(null, {
+                    name: root.mathResult,
+                    verb: "Copy",
+                    type: "Math result",
+                    fontType: LauncherSearchResult.FontType.Monospace,
+                    iconName: 'calculate',
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => { Quickshell.clipboardText = root.mathResult; }
+                })];
+            }
+            return [];
+        }
+        
         ////////////////// Empty query - show recent history //////////////////
         if (root.query == "") {
             // Loading guard: wait for all async data sources to load before showing results
@@ -1499,97 +1589,6 @@ Singleton {
             return recentItems;
         }
 
-        ///////////// Special cases (exclusive - return early) ///////////////
-        
-        // Actions/Plugins in exclusive mode - show only actions and plugins
-        if (root.exclusiveMode === "action") {
-            const searchString = root.query.split(" ")[0];
-            const actionArgs = root.query.split(" ").slice(1).join(" ");
-            
-            // Get actions
-            const actionMatches = searchString === "" 
-                ? root.allActions.slice(0, 20)
-                : Fuzzy.go(searchString, root.preppedActions, { key: "name", limit: 20 }).map(r => r.obj.action);
-            
-            const actionItems = actionMatches.map(action => {
-                const hasArgs = actionArgs.length > 0;
-                return resultComp.createObject(null, {
-                    name: action.action + (hasArgs ? " " + actionArgs : ""),
-                    verb: "Run",
-                    type: "Action",
-                    iconName: 'settings_suggest',
-                    iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => {
-                        root.recordSearch("action", action.action, root.query);
-                        action.execute(actionArgs);
-                    }
-                });
-            });
-            
-            // Get plugins
-            const pluginMatches = searchString === ""
-                ? PluginRunner.plugins.slice(0, 20)
-                : Fuzzy.go(searchString, root.preppedPlugins, { key: "name", limit: 20 }).map(r => r.obj.plugin);
-            
-            const pluginItems = pluginMatches.map(plugin => {
-                return resultComp.createObject(null, {
-                    name: plugin.manifest?.name || plugin.id,
-                    comment: plugin.manifest?.description || "",
-                    verb: "Open",
-                    type: "Plugin",
-                    iconName: plugin.manifest?.icon || 'extension',
-                    iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => {
-                        root.recordSearch("workflow", plugin.id, root.query);
-                        root.startPlugin(plugin.id);
-                    }
-                });
-            });
-            
-            return [...pluginItems, ...actionItems].filter(Boolean);
-        }
-        
-        // Emojis in exclusive mode - show full emoji results
-        if (root.exclusiveMode === "emoji") {
-            const searchString = root.query;
-            return Emojis.fuzzyQuery(searchString).map(entry => {
-                const emoji = entry.match(/^\s*(\S+)/)?.[1] || "";
-                return resultComp.createObject(null, {
-                    rawValue: entry,
-                    name: entry.replace(/^\s*\S+\s+/, ""),
-                    iconName: emoji,
-                    iconType: LauncherSearchResult.IconType.Text,
-                    verb: "Copy",
-                    type: "Emoji",
-                    execute: () => {
-                        Quickshell.clipboardText = entry.match(/^\s*(\S+)/)?.[1];
-                    }
-                });
-            }).filter(Boolean);
-        }
-        
-        // Math in exclusive mode - show only math result
-        if (root.exclusiveMode === "math") {
-            // Trigger math calculation
-            nonAppResultsTimer.restart();
-            
-            // Use the query directly as math expression
-            if (root.mathResult && root.mathResult !== root.query) {
-                return [resultComp.createObject(null, {
-                    name: root.mathResult,
-                    verb: "Copy",
-                    type: "Math result",
-                    fontType: LauncherSearchResult.FontType.Monospace,
-                    iconName: 'calculate',
-                    iconType: LauncherSearchResult.IconType.Material,
-                    execute: () => { Quickshell.clipboardText = root.mathResult; }
-                })];
-            }
-            return [];
-        }
-        
-
-        
         ////////////////// Tiered Ranking System ///////////////////
         // Uses intent detection and category-based ranking instead of magic score numbers.
         
