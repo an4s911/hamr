@@ -91,7 +91,7 @@ cp -r hamr ~/.config/quickshell/hamr
 
 # 2. Symlink plugins
 mkdir -p ~/.config/hamr
-ln -s ~/.config/quickshell/hamr/actions ~/.config/hamr/actions
+ln -s ~/.config/quickshell/hamr/plugins ~/.config/hamr/plugins
 
 # 3. Add Hyprland keybinding (~/.config/hypr/hyprland.conf)
 # bind = Super, Super_L, global, quickshell:hamrToggle
@@ -128,7 +128,7 @@ Hamr uses Material Design colors from `~/.local/state/user/generated/colors.json
 
 ## Creating Plugins
 
-Plugins live in `~/.config/hamr/actions/`. Each plugin is either:
+Plugins live in `~/.config/hamr/plugins/`. Each plugin is either:
 - A **folder** with `manifest.json` + handler executable (multi-step plugins)
 - An **executable script** (simple one-shot actions)
 
@@ -154,7 +154,7 @@ Plugins live in `~/.config/hamr/actions/`. Each plugin is either:
 <summary><strong>Quick Start: Hello World Plugin</strong></summary>
 
 ```bash
-mkdir -p ~/.config/hamr/actions/hello
+mkdir -p ~/.config/hamr/plugins/hello
 ```
 
 **manifest.json:**
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 ```
 
 ```bash
-chmod +x ~/.config/hamr/actions/hello/handler.py
+chmod +x ~/.config/hamr/plugins/hello/handler.py
 ```
 
 Type `/hello` to try it!
@@ -317,7 +317,7 @@ For one-shot actions, create executable scripts directly:
 
 ```bash
 #!/bin/bash
-# ~/.config/hamr/actions/screenshot
+# ~/.config/hamr/plugins/screenshot
 grim -g "$(slurp)" - | wl-copy
 notify-send "Screenshot copied"
 ```
@@ -382,7 +382,7 @@ Terms naturally age out based on frecency, so your shortcuts stay relevant as ha
 ~/.config/quickshell/hamr/
 ├── shell.qml                    # Entry point
 ├── GlobalStates.qml             # UI state
-├── actions/                     # Built-in plugins
+├── plugins/                     # Built-in plugins
 ├── modules/
 │   ├── common/                  # Appearance, Config, widgets
 │   ├── launcher/                # Launcher UI components
@@ -433,7 +433,7 @@ Want functionality from a Raycast extension? Use the built-in `create-plugin` wo
 > Replicate this Raycast extension: https://github.com/raycast/extensions/tree/main/extensions/browser-bookmarks
 ```
 
-The AI will analyze the Raycast extension, translate the patterns to Hamr's protocol, and create a native Linux plugin. See [`actions/AGENTS.md`](actions/AGENTS.md#converting-raycast-extensions) for the full conversion guide.
+The AI will analyze the Raycast extension, translate the patterns to Hamr's protocol, and create a native Linux plugin. See [`plugins/AGENTS.md`](plugins/AGENTS.md#converting-raycast-extensions) for the full conversion guide.
 
 ## License
 

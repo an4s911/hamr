@@ -33,7 +33,7 @@ Symlinked to `~/.config/quickshell/` for testing.
 - Tab completion support properties
 
 **b966e2d5** - `feat: add support for custom user action scripts`
-- Custom actions by placing executable scripts in `~/.config/hamr/actions/`
+- Custom actions by placing executable scripts in `~/.config/hamr/plugins/`
 - Script filename becomes the action name
 - Use `/script-name` in search bar to execute
 
@@ -41,7 +41,7 @@ Symlinked to `~/.config/quickshell/` for testing.
 
 **Multi-Step Workflow System**
 - New `services/WorkflowRunner.qml` - Manages bidirectional JSON communication with workflow handlers
-- Workflows are folders in `~/.config/hamr/actions/` containing:
+- Workflows are folders in `~/.config/hamr/plugins/` containing:
   - `manifest.json` - Workflow metadata (name, description, icon)
   - `handler.py` - Python script using JSON protocol
 - New `modules/ii/overview/WorkflowCard.qml` - Card UI for rich content display (markdown support)
@@ -173,7 +173,7 @@ bind = SUPER SHIFT, S, exec, qs -c hamr ipc call hamr workflow screenshot
 
 **Other compositors/WMs**: Use your compositor's keybind config to execute the same `qs -c hamr ipc call hamr workflow <name>` command.
 
-To find available workflow names, check `~/.config/hamr/actions/` - each folder name is a workflow ID.
+To find available workflow names, check `~/.config/hamr/plugins/` - each folder name is a workflow ID.
 
 ### Cross-Config IPC
 
@@ -184,7 +184,7 @@ Handlers can call IPC on other Quickshell configs. For example, the todo plugin 
 qs -c ii ipc call todo refresh
 ```
 
-See [`actions/AGENTS.md`](actions/AGENTS.md) for Python helper functions.
+See [`plugins/AGENTS.md`](plugins/AGENTS.md) for Python helper functions.
 
 ## Testing Commands
 
@@ -389,7 +389,7 @@ def main():
 ```
 
 ### Creating a New Workflow
-1. Create folder: `~/.config/hamr/actions/myworkflow/`
+1. Create folder: `~/.config/hamr/plugins/myworkflow/`
 2. Create `manifest.json`:
    ```json
    {"name": "My Workflow", "description": "Does something", "icon": "extension"}
@@ -563,7 +563,7 @@ def main():
 
 ## Built-in Workflows
 
-> **Full plugin API documentation:** See [`actions/AGENTS.md`](actions/AGENTS.md) for complete JSON protocol reference and examples.
+> **Full plugin API documentation:** See [`plugins/AGENTS.md`](plugins/AGENTS.md) for complete JSON protocol reference and examples.
 
 | Plugin | Trigger | Key Patterns Demonstrated |
 |--------|---------|---------------------------|

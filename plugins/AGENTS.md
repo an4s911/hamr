@@ -1,6 +1,6 @@
-# User Actions & Workflows
+# Plugins & Workflows
 
-This directory contains custom actions and workflows for the Hamr launcher.
+This directory contains plugins and workflows for the Hamr launcher.
 
 ## Language Agnostic
 
@@ -18,7 +18,7 @@ The handler just needs to be executable and read JSON from stdin, write JSON to 
 ## Directory Structure
 
 ```
-~/.config/hamr/actions/
+~/.config/hamr/plugins/
 ├── AGENTS.md           # This file
 ├── simple-script       # Simple action (executable script)
 ├── workflow-name/      # Multi-step workflow (folder)
@@ -34,11 +34,11 @@ The handler just needs to be executable and read JSON from stdin, write JSON to 
 
 ```bash
 # 1. Create executable script
-cat > ~/.config/hamr/actions/my-action << 'EOF'
+cat > ~/.config/hamr/plugins/my-action << 'EOF'
 #!/bin/bash
 notify-send "Hello from my action!"
 EOF
-chmod +x ~/.config/hamr/actions/my-action
+chmod +x ~/.config/hamr/plugins/my-action
 
 # 2. Appears as `/my-action` in launcher
 ```
@@ -49,14 +49,14 @@ chmod +x ~/.config/hamr/actions/my-action
 
 ```bash
 # 1. Create folder with manifest and handler
-mkdir ~/.config/hamr/actions/hello
-cat > ~/.config/hamr/actions/hello/manifest.json << 'EOF'
+mkdir ~/.config/hamr/plugins/hello
+cat > ~/.config/hamr/plugins/hello/manifest.json << 'EOF'
 {"name": "Hello", "description": "Greeting plugin", "icon": "waving_hand"}
 EOF
 
 # 2. Create handler (see template below)
-touch ~/.config/hamr/actions/hello/handler.py
-chmod +x ~/.config/hamr/actions/hello/handler.py
+touch ~/.config/hamr/plugins/hello/handler.py
+chmod +x ~/.config/hamr/plugins/hello/handler.py
 ```
 
 ---
