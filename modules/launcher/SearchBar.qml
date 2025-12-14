@@ -18,6 +18,11 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
     
+    // Drag handle signals
+    signal dragStarted(real mouseX, real mouseY)
+    signal dragMoved(real mouseX, real mouseY)
+    signal dragEnded()
+    
     // Custom placeholder from active plugin or exclusive mode
     readonly property string pluginPlaceholder: PluginRunner.isActive() ? PluginRunner.pluginPlaceholder : ""
     readonly property string exclusiveModePlaceholder: {
@@ -154,4 +159,41 @@ RowLayout {
         onAccepted: root.selectCurrent()
     }
 
+    // Drag handle icon
+    Item {
+        Layout.alignment: Qt.AlignVCenter
+        implicitWidth: 24
+        implicitHeight: 24
+        
+        MaterialSymbol {
+            anchors.centerIn: parent
+            iconSize: Appearance.font.pixelSize.normal
+            text: "drag_indicator"
+            color: dragHandleArea.containsMouse || dragHandleArea.pressed 
+                ? Appearance.colors.colOnSurface 
+                : Appearance.m3colors.m3outline
+        }
+        
+        MouseArea {
+            id: dragHandleArea
+            anchors.fill: parent
+            anchors.margins: -8 // Extend hit area
+            hoverEnabled: true
+            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            
+            onPressed: mouse => {
+                const globalPos = mapToGlobal(mouse.x, mouse.y);
+                root.dragStarted(globalPos.x, globalPos.y);
+            }
+            
+            onPositionChanged: mouse => {
+                if (pressed) {
+                    const globalPos = mapToGlobal(mouse.x, mouse.y);
+                    root.dragMoved(globalPos.x, globalPos.y);
+                }
+            }
+            
+            onReleased: root.dragEnded()
+        }
+    }
 }

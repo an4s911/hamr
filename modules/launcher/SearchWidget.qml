@@ -24,6 +24,11 @@ Item { // Wrapper
     
     // Expose the content rectangle for input masking
     property alias contentItem: searchWidgetContent
+    
+    // Forward drag signals from SearchBar
+    signal dragStarted(real mouseX, real mouseY)
+    signal dragMoved(real mouseX, real mouseY)
+    signal dragEnded()
 
     function focusFirstItem() {
         if (appResults.count > 0) {
@@ -158,11 +163,16 @@ Item { // Wrapper
                 SearchBar {
                     id: searchBar
                     anchors.centerIn: parent
-                Synchronizer on searchingText {
-                    property alias source: root.searchingText
-                }
+                    Synchronizer on searchingText {
+                        property alias source: root.searchingText
+                    }
+                    
+                    // Forward drag signals
+                    onDragStarted: (mouseX, mouseY) => root.dragStarted(mouseX, mouseY)
+                    onDragMoved: (mouseX, mouseY) => root.dragMoved(mouseX, mouseY)
+                    onDragEnded: root.dragEnded()
                 
-                onNavigateDown: {
+                    onNavigateDown: {
                     if (appResults.currentIndex < appResults.count - 1) {
                         appResults.currentIndex++;
                     }

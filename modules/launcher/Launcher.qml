@@ -195,50 +195,43 @@ Scope {
                     }
                 }
 
-                // Drag handle overlay at top of search widget
-                MouseArea {
-                    id: dragArea
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                        right: parent.right
+                SearchWidget {
+                    id: searchWidget
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    Synchronizer on searchingText {
+                        property alias source: root.searchingText
                     }
-                    height: 40 + Appearance.sizes.elevationMargin * 20 // Cover top margin + some of the search bar
-                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                     
-                    // Use offset from item origin to maintain relative position during drag
-                    property real offsetX: 0
-                    property real offsetY: 0
+                    // Drag offset from mouse to widget origin
+                    property real dragOffsetX: 0
+                    property real dragOffsetY: 0
                     
-                    onPressed: mouse => {
+                    onDragStarted: (mouseX, mouseY) => {
                         columnLayout.isDragging = true;
-                        // Calculate offset from mouse position to item origin
-                        const globalPos = mapToItem(fullScreenBackground, mouse.x, mouse.y);
-                        offsetX = globalPos.x - columnLayout.x;
-                        offsetY = globalPos.y - columnLayout.y;
+                        // Calculate offset from global mouse position to columnLayout origin
+                        const widgetGlobalPos = columnLayout.mapToGlobal(0, 0);
+                        dragOffsetX = mouseX - widgetGlobalPos.x;
+                        dragOffsetY = mouseY - widgetGlobalPos.y;
                     }
                     
-                    onPositionChanged: mouse => {
-                        if (pressed) {
-                            // Convert mouse position to screen coordinates
-                            const globalPos = mapToItem(fullScreenBackground, mouse.x, mouse.y);
-                            let newX = globalPos.x - offsetX;
-                            let newY = globalPos.y - offsetY;
-                            
-                            // Clamp to keep widget visible on screen
-                            // Allow negative y to account for top margin in SearchWidget
-                            const screenW = fullScreenBackground.width;
-                            const screenH = fullScreenBackground.height;
-                            const topMargin = Appearance.sizes.elevationMargin * 20;
-                            newX = Math.max(0, Math.min(newX, screenW - columnLayout.width));
-                            newY = Math.max(-topMargin, Math.min(newY, screenH - columnLayout.height));
-                            
-                            columnLayout.x = newX;
-                            columnLayout.y = newY;
-                        }
+                    onDragMoved: (mouseX, mouseY) => {
+                        // Convert global mouse position to fullScreenBackground coordinates
+                        const bgGlobalPos = fullScreenBackground.mapToGlobal(0, 0);
+                        let newX = mouseX - bgGlobalPos.x - dragOffsetX;
+                        let newY = mouseY - bgGlobalPos.y - dragOffsetY;
+                        
+                        // Clamp to keep widget visible on screen
+                        const screenW = fullScreenBackground.width;
+                        const screenH = fullScreenBackground.height;
+                        const topMargin = Appearance.sizes.elevationMargin * 20;
+                        newX = Math.max(0, Math.min(newX, screenW - columnLayout.width));
+                        newY = Math.max(-topMargin, Math.min(newY, screenH - columnLayout.height));
+                        
+                        columnLayout.x = newX;
+                        columnLayout.y = newY;
                     }
                     
-                    onReleased: {
+                    onDragEnded: {
                         // Save position as ratio for resolution independence
                         const screenW = fullScreenBackground.width;
                         const screenH = fullScreenBackground.height;
@@ -253,14 +246,6 @@ Scope {
                         Persistent.states.launcher.yRatio = yRatio;
                         
                         columnLayout.isDragging = false;
-                    }
-                }
-
-                SearchWidget {
-                    id: searchWidget
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    Synchronizer on searchingText {
-                        property alias source: root.searchingText
                     }
                 }
             }
