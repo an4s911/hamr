@@ -353,8 +353,8 @@ RippleButton {
                     property string iconName: modelData.iconName ?? ""
                     property string keyHint: (index + 1).toString()
                     property bool isFocused: root.focusedActionIndex === index && root.ListView.isCurrentItem
-                    implicitHeight: 34
-                    implicitWidth: 34
+                    implicitHeight: 28
+                    implicitWidth: 28
 
                     Rectangle {
                         id: actionBg
@@ -372,8 +372,9 @@ RippleButton {
                         active: actionButton.iconType === LauncherSearchResult.IconType.Material || actionButton.iconName === ""
                         sourceComponent: MaterialSymbol {
                             text: actionButton.iconName || "video_settings"
-                            font.pixelSize: Appearance.font.pixelSize.hugeass
-                            color: actionButton.isFocused ? Appearance.m3colors.m3onPrimary : Appearance.m3colors.m3onSurface
+                            font.pixelSize: Appearance.font.pixelSize.normal
+                            color: actionButton.isFocused ? Appearance.m3colors.m3onPrimary : Appearance.colors.colSubtext
+                            opacity: actionButton.isFocused ? 1.0 : 0.8
                         }
                     }
                     Loader {
@@ -381,7 +382,7 @@ RippleButton {
                         active: actionButton.iconType === LauncherSearchResult.IconType.System && actionButton.iconName !== ""
                         sourceComponent: IconImage {
                             source: Quickshell.iconPath(actionButton.iconName)
-                            implicitSize: 20
+                            implicitSize: 16
                         }
                     }
 
