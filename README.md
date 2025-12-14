@@ -57,6 +57,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 | `notes` | `/notes` | Quick notes with multi-line content support |
 | `pictures` | `/pictures` | Browse images with thumbnails |
 | `screenshot` | `/screenshot` | Browse screenshots with OCR text search |
+| `screenrecord` | `/screenrecord` | Screen recording with auto-trim (wf-recorder) |
 | `snippet` | `/snippet` | Text snippets for quick insertion |
 | `todo` | `/todo` | Simple todo list manager |
 | `wallpaper` | `/wallpaper` | Wallpaper selector (illogical-impulse) |

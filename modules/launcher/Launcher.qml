@@ -15,6 +15,22 @@ Scope {
     id: launcherScope
     property bool dontAutoCancelSearch: false
 
+    // Write launch timestamp for plugins that need to know when hamr was opened
+    // (e.g., screenrecord plugin uses this to trim the end of recordings)
+    Process {
+        id: launchTimestampProc
+        command: ["bash", "-c", "mkdir -p ~/.cache/hamr && date +%s%3N > ~/.cache/hamr/launch_timestamp"]
+    }
+
+    Connections {
+        target: GlobalStates
+        function onLauncherOpenChanged() {
+            if (GlobalStates.launcherOpen) {
+                launchTimestampProc.running = true;
+            }
+        }
+    }
+
     Variants {
         id: launcherVariants
         model: Quickshell.screens

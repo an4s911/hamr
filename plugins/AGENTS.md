@@ -456,6 +456,53 @@ call_ipc("ii", "todo", "refresh")
 
 ---
 
+## Launch Timestamp API
+
+Hamr writes a timestamp file every time it opens. This is useful for plugins that need to know when hamr was launched (e.g., for trimming recordings to remove hamr UI).
+
+### File Location
+
+```
+~/.cache/hamr/launch_timestamp
+```
+
+### File Format
+
+Unix timestamp in milliseconds (e.g., `1734567890123`)
+
+### Reading from Python
+
+```python
+from pathlib import Path
+import time
+
+LAUNCH_TIMESTAMP_FILE = Path.home() / ".cache" / "hamr" / "launch_timestamp"
+
+def get_hamr_launch_time() -> int:
+    """Get timestamp (ms) when hamr was last opened."""
+    try:
+        return int(LAUNCH_TIMESTAMP_FILE.read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return int(time.time() * 1000)
+
+# Calculate time since hamr opened
+launch_time_ms = get_hamr_launch_time()
+now_ms = int(time.time() * 1000)
+time_since_launch_ms = now_ms - launch_time_ms
+```
+
+### Use Cases
+
+| Use Case | Description |
+|----------|-------------|
+| Screen recording | Trim end of recording to remove hamr UI when stopping |
+| Activity tracking | Log when user invokes the launcher |
+| Performance timing | Measure plugin response time relative to launch |
+
+**Example plugin:** [`screenrecord/`](screenrecord/handler.py) - Uses launch timestamp to calculate how much to trim from the end of recordings
+
+---
+
 ## Handler Template
 
 ```python
@@ -576,6 +623,7 @@ For desktop application icons from `.desktop` files, set `"iconType": "system"`:
 | [`dict/`](dict/) | `/dict` | Dictionary lookup | Card response, API fetch |
 | [`pictures/`](pictures/) | `/pictures` | Image browser | Thumbnails, multi-turn navigation |
 | [`screenshot/`](screenshot/) | `/screenshot` | Screenshot browser | imageBrowser, enableOcr |
+| [`screenrecord/`](screenrecord/) | `/screenrecord` | Screen recorder | Launch timestamp API, ffmpeg trim |
 | [`snippet/`](snippet/) | `/snippet` | Text snippets | Submit mode for add |
 | [`todo/`](todo/) | `/todo` | Todo list | Submit mode, IPC refresh, CRUD |
 | [`wallpaper/`](wallpaper/) | `/wallpaper` | Wallpaper selector | imageBrowser, history tracking |
