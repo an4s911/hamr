@@ -1618,66 +1618,25 @@ Singleton {
         return trimmed;
     }
     
-    // ==================== MATH EXPRESSION DETECTION ====================
-    // Detect if a query looks like a math expression before sending to qalc.
-    // This prevents random text from being interpreted as math.
-    //
-    // Valid math expressions:
-    //   - Start with number: "123", "3.14", ".5"
-    //   - Start with math prefix (=)
-    //   - Start with operator for implicit ans: "+5", "-3", "*2", "/4"
-    //   - Start with parenthesis: "(1+2)*3"
-    //   - Start with math function: "sin(", "sqrt(", "log(", etc.
-    //   - Contain operators between numbers: "1+2", "3*4"
-    //
-    // NOT math:
-    //   - Plain text: "firefox", "hello world"
-    //   - URLs: "github.com"
-    //   - File paths: "~/documents"
+    // ==================== MATH/CALCULATOR ====================
+    // Detection and preprocessing delegated to CalcUtils singleton.
+    // Supports: math, temperature, currency, units, percentages, time.
     // ==================================================================
     
-    property var mathFunctionPattern: /^(sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|sqrt|cbrt|log|ln|exp|abs|ceil|floor|round|factorial|rand)\s*\(/i
-    property var mathExpressionPattern: /^[\d\.\(\)\+\-\*\/\^\%\s]*([\+\-\*\/\^\%][\d\.\(\)\+\-\*\/\^\%\s]*)+$/
-    
     function isMathExpression(query) {
-        const trimmed = query.trim();
-        if (!trimmed) return false;
-        
-        // Explicit math prefix always triggers math
-        if (trimmed.startsWith(Config.options.search.prefix.math)) return true;
-        
-        // Starts with digit or decimal point
-        if (/^[\d\.]/.test(trimmed)) return true;
-        
-        // Starts with operator (implies previous answer)
-        if (/^[\+\-\*\/\^]/.test(trimmed)) return true;
-        
-        // Starts with opening parenthesis
-        if (trimmed.startsWith('(')) return true;
-        
-        // Starts with math function
-        if (mathFunctionPattern.test(trimmed)) return true;
-        
-        // Contains math operators between things that look like numbers
-        // e.g., "2+2", "10*5", "100/4"
-        if (mathExpressionPattern.test(trimmed)) return true;
-        
-        return false;
+        return CalcUtils.isMathExpression(query, Config.options.search.prefix.math);
     }
     
     Timer {
         id: nonAppResultsTimer
         interval: Config.options.search.nonAppResultDelay
         onTriggered: {
-            let expr = root.query;
-            // Strip math prefix if present (for non-exclusive mode)
-            if (expr.startsWith(Config.options.search.prefix.math)) {
-                expr = expr.slice(Config.options.search.prefix.math.length);
-            }
+            // Preprocess the expression (handles temp, currency, percentages, etc.)
+            const expr = CalcUtils.preprocessExpression(root.query, Config.options.search.prefix.math);
             
-            // In exclusive math mode, always try to calculate (query is already the expression)
+            // In exclusive math mode, always try to calculate
             // Otherwise, only calculate if it looks like math
-            if (root.exclusiveMode === "math" || root.isMathExpression(expr)) {
+            if (root.exclusiveMode === "math" || root.isMathExpression(root.query)) {
                 if (expr.trim()) {
                     mathProc.calculateExpression(expr);
                 } else {
