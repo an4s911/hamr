@@ -325,12 +325,24 @@ Singleton {
     
     property var preppedStaticSearchables: []
     
+    // Debounce timer for static searchables rebuild
+    // Prevents excessive rebuilds during startup when multiple sources load
+    Timer {
+        id: staticRebuildTimer
+        interval: 100
+        onTriggered: root.doRebuildStaticSearchables()
+    }
+    
     function rebuildStaticSearchables() {
-        console.log("[LauncherSearch] Rebuilding static searchables...");
+        staticRebuildTimer.restart();
+    }
+    
+    function doRebuildStaticSearchables() {
         const items = [];
         
         // ========== APPS ==========
-        for (const preppedApp of AppSearch.preppedNames) {
+        const appNames = AppSearch.preppedNames ?? [];
+        for (const preppedApp of appNames) {
             const entry = preppedApp.entry;
             items.push({
                 name: preppedApp.name,
@@ -342,7 +354,8 @@ Singleton {
         }
         
         // ========== ACTIONS ==========
-        for (const preppedAction of root.preppedActions) {
+        const actions = root.preppedActions ?? [];
+        for (const preppedAction of actions) {
             const action = preppedAction.action;
             items.push({
                 name: preppedAction.name,
@@ -354,7 +367,8 @@ Singleton {
         }
         
         // ========== WORKFLOWS ==========
-        for (const preppedPlugin of root.preppedPlugins) {
+        const plugins = root.preppedPlugins ?? [];
+        for (const preppedPlugin of plugins) {
             const plugin = preppedPlugin.plugin;
             items.push({
                 name: preppedPlugin.name,
@@ -366,7 +380,8 @@ Singleton {
         }
         
         // ========== QUICKLINKS ==========
-        for (const preppedLink of root.preppedQuicklinks) {
+        const quicklinks = root.preppedQuicklinks ?? [];
+        for (const preppedLink of quicklinks) {
             const link = preppedLink.quicklink;
             items.push({
                 name: preppedLink.name,
@@ -378,7 +393,8 @@ Singleton {
         }
         
         // ========== EMOJIS ==========
-        for (const preppedEmoji of Emojis.preparedEntries) {
+        const emojis = Emojis.preparedEntries ?? [];
+        for (const preppedEmoji of emojis) {
             const entry = preppedEmoji.entry;
             items.push({
                 name: preppedEmoji.name,
@@ -397,6 +413,32 @@ Singleton {
     Connections {
         target: Quickshell
         function onReloadCompleted() {
+            root.rebuildStaticSearchables();
+        }
+    }
+    
+    // Rebuild static searchables when plugins change (new plugin added/removed)
+    Connections {
+        target: PluginRunner
+        function onPluginsChanged() {
+            root.rebuildStaticSearchables();
+        }
+    }
+    
+    // Rebuild static searchables when quicklinks change
+    onQuicklinksChanged: {
+        root.rebuildStaticSearchables();
+    }
+    
+    // Rebuild static searchables when actions change (new script added/removed)
+    onAllActionsChanged: {
+        root.rebuildStaticSearchables();
+    }
+    
+    // Rebuild static searchables when emojis are loaded
+    Connections {
+        target: Emojis
+        function onListChanged() {
             root.rebuildStaticSearchables();
         }
     }
