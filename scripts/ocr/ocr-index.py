@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore  # Dependencies installed via system packages (python-click, tesseract)
 """
 OCR indexing script for ImageBrowser.
 Runs tesseract on images in a directory and caches results for fast text search.
@@ -14,12 +15,10 @@ Cache stored in ~/.cache/hamr/ocr-index/<directory-hash>.json
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -73,7 +72,11 @@ def get_tesseract_languages() -> str:
             text=True,
             timeout=5,
         )
-        langs = [l.strip() for l in result.stdout.strip().split("\n")[1:] if l.strip()]
+        langs = [
+            lang.strip()
+            for lang in result.stdout.strip().split("\n")[1:]
+            if lang.strip()
+        ]
         return "+".join(langs) if langs else "eng"
     except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
         return "eng"

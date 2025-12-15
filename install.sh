@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# Hamr installation script
+# Usage: ./install.sh [--uninstall]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+QUICKSHELL_DIR="$CONFIG_DIR/quickshell"
+HAMR_LINK="$QUICKSHELL_DIR/hamr"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+get_aur_helper() {
+    for helper in paru yay pikaur trizen aurman; do
+        if command -v "$helper" >/dev/null 2>&1; then
+            echo "$helper"
+            return
+        fi
+    done
+    echo "pacman"  # fallback, won't work for AUR packages
+}
+
+get_dependencies_from_pkgbuild() {
+    # Source PKGBUILD to get depends array
+    local pkgbuild="$SCRIPT_DIR/PKGBUILD"
+    if [[ -f "$pkgbuild" ]]; then
+        # shellcheck source=/dev/null
+        source "$pkgbuild"
+        echo "${depends[@]}"
+    fi
+}
+
+get_missing_dependencies() {
+    local all_deps
+    all_deps=$(get_dependencies_from_pkgbuild)
+    local missing=()
+
+    for dep in $all_deps; do
+        # pacman -Qq checks if package is installed (including as a provider)
+        if ! pacman -Qq "$dep" &>/dev/null; then
+            missing+=("$dep")
+        fi
+    done
+
+    echo "${missing[@]}"
+}
+
+install_dependencies() {
+    local helper
+    helper=$(get_aur_helper)
+    local missing
+    missing=$(get_missing_dependencies)
+
+    if [[ -z "$missing" ]]; then
+        info "All dependencies already installed."
+        return 0
+    fi
+
+    info "Installing dependencies with $helper..."
+    echo "Packages: $missing"
+    echo ""
+
+    if [[ "$helper" == "pacman" ]]; then
+        warn "No AUR helper found. Some packages require AUR."
+        warn "Install an AUR helper first: https://wiki.archlinux.org/title/AUR_helpers"
+        exit 1
+    else
+        $helper -S --needed $missing
+    fi
+}
+
+check_dependencies() {
+    local missing
+    missing=$(get_missing_dependencies)
+
+    if [[ -n "$missing" ]]; then
+        warn "Missing dependencies:"
+        for dep in $missing; do
+            echo "  - $dep"
+        done
+        echo ""
+        local helper
+        helper=$(get_aur_helper)
+        
+        read -p "Install dependencies automatically? [Y/n] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            install_dependencies
+            # Re-check after install
+            missing=$(get_missing_dependencies)
+            if [[ -n "$missing" ]]; then
+                error "Some dependencies failed to install: $missing"
+            fi
+        else
+            echo "Install manually with:"
+            echo "  $helper -S $missing"
+            echo ""
+            read -p "Continue anyway? [y/N] " -n 1 -r
+            echo
+            [[ $REPLY =~ ^[Yy]$ ]] || exit 1
+        fi
+    else
+        info "All required dependencies installed."
+    fi
+
+    # Show optional dependencies from PKGBUILD
+    local pkgbuild="$SCRIPT_DIR/PKGBUILD"
+    if [[ -f "$pkgbuild" ]]; then
+        # shellcheck source=/dev/null
+        source "$pkgbuild"
+        if [[ ${#optdepends[@]} -gt 0 ]]; then
+            local missing_opt=()
+            for opt in "${optdepends[@]}"; do
+                local pkg="${opt%%:*}"
+                if ! pacman -Qi "$pkg" &>/dev/null; then
+                    missing_opt+=("$opt")
+                fi
+            done
+            if [[ ${#missing_opt[@]} -gt 0 ]]; then
+                info "Optional dependencies not installed:"
+                for dep in "${missing_opt[@]}"; do
+                    echo "  - $dep"
+                done
+            fi
+        fi
+    fi
+}
+
+install_hamr() {
+    info "Installing hamr..."
+
+    # Create quickshell config directory
+    mkdir -p "$QUICKSHELL_DIR"
+
+    # Remove existing symlink or directory
+    if [[ -L "$HAMR_LINK" ]]; then
+        rm "$HAMR_LINK"
+    elif [[ -d "$HAMR_LINK" ]]; then
+        warn "Existing hamr directory found at $HAMR_LINK"
+        read -p "Replace with symlink? [y/N] " -n 1 -r
+        echo
+        [[ $REPLY =~ ^[Yy]$ ]] || exit 1
+        rm -rf "$HAMR_LINK"
+    fi
+
+    # Create symlink
+    ln -s "$SCRIPT_DIR" "$HAMR_LINK"
+    info "Created symlink: $HAMR_LINK -> $SCRIPT_DIR"
+
+    # Create user plugins directory
+    mkdir -p "$CONFIG_DIR/hamr/plugins"
+    info "Created user plugins directory: $CONFIG_DIR/hamr/plugins"
+    info "Built-in plugins loaded from: $SCRIPT_DIR/plugins/"
+    info "User plugins loaded from: $CONFIG_DIR/hamr/plugins/"
+
+    # Make scripts executable
+    chmod +x "$SCRIPT_DIR/scripts/thumbnails/thumbgen.sh" 2>/dev/null || true
+    chmod +x "$SCRIPT_DIR/scripts/thumbnails/thumbgen.py" 2>/dev/null || true
+    chmod +x "$SCRIPT_DIR/scripts/ocr/ocr-index.sh" 2>/dev/null || true
+    chmod +x "$SCRIPT_DIR/scripts/ocr/ocr-index.py" 2>/dev/null || true
+
+    info "Installation complete!"
+    echo ""
+    echo "Start hamr with:"
+    echo "  qs -c hamr"
+    echo ""
+    echo "Or add to your compositor config for autostart."
+}
+
+update_hamr() {
+    info "Updating hamr..."
+
+    if [[ ! -d "$SCRIPT_DIR/.git" ]]; then
+        error "Not a git repository. Cannot update."
+    fi
+
+    cd "$SCRIPT_DIR"
+    
+    # Check for local changes
+    if [[ -n $(git status --porcelain) ]]; then
+        warn "Local changes detected:"
+        git status --short
+        echo ""
+        echo "Options:"
+        echo "  1. Stash changes:  git stash && ./install.sh -U && git stash pop"
+        echo "  2. Commit changes: git add -A && git commit -m 'local changes'"
+        echo "  3. Discard changes: git checkout -- ."
+        echo ""
+        error "Please resolve local changes before updating."
+    fi
+
+    git pull --rebase
+
+    info "Update complete!"
+    echo ""
+    echo "Restart quickshell to apply changes:"
+    echo "  qs -c hamr"
+}
+
+uninstall_hamr() {
+    info "Uninstalling hamr..."
+
+    if [[ -L "$HAMR_LINK" ]]; then
+        rm "$HAMR_LINK"
+        info "Removed symlink: $HAMR_LINK"
+    elif [[ -d "$HAMR_LINK" ]]; then
+        warn "Found directory instead of symlink at $HAMR_LINK"
+        read -p "Remove it? [y/N] " -n 1 -r
+        echo
+        [[ $REPLY =~ ^[Yy]$ ]] && rm -rf "$HAMR_LINK"
+    else
+        warn "No hamr installation found at $HAMR_LINK"
+    fi
+
+    info "Uninstall complete. User data in $CONFIG_DIR/hamr/ was preserved."
+}
+
+# Main
+case "${1:-}" in
+    --update|-U)
+        update_hamr
+        ;;
+    --uninstall|-u)
+        uninstall_hamr
+        ;;
+    --check|-c)
+        check_dependencies
+        ;;
+    --help|-h)
+        echo "Usage: $0 [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  --check, -c      Check dependencies only"
+        echo "  --update, -U     Update hamr via git pull"
+        echo "  --uninstall, -u  Remove hamr installation"
+        echo "  --help, -h       Show this help"
+        echo ""
+        echo "Without options, installs hamr by creating a symlink in ~/.config/quickshell/"
+        ;;
+    *)
+        check_dependencies
+        install_hamr
+        ;;
+esac

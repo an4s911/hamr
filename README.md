@@ -114,134 +114,116 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 
 ## Installation
 
-### Prerequisites
+### Arch Linux (Recommended)
 
-- [Hyprland](https://hyprland.org/) (required)
-- [Quickshell](https://quickshell.outfoxxed.me/)
-- Optional: [illogical-impulse](https://github.com/end-4/dots-hyprland) for full theme integration
-- Optional: `fd`, `fzf`, `cliphist`, `wl-clipboard`, `bw` (Bitwarden CLI), `tesseract` (OCR) for respective plugins
+```bash
+# Clone the repository
+git clone https://github.com/stewart86/hamr.git
+cd hamr
 
-### Required Fonts
+# Run the install script (auto-installs dependencies)
+./install.sh
+```
 
-Hamr requires the following fonts for proper display:
+The install script will:
+- Check for missing dependencies and offer to install them via your AUR helper (paru, yay, etc.)
+- Create a symlink at `~/.config/quickshell/hamr`
+- Set up the user plugins directory at `~/.config/hamr/plugins/`
+
+<details>
+<summary><strong>What gets installed</strong></summary>
+
+**Required dependencies:**
+| Category | Packages |
+|----------|----------|
+| Core | `quickshell` >= 0.2.1 (or `quickshell-git`) |
+| Python | `python`, `python-click`, `python-loguru`, `python-tqdm`, `python-gobject`, `gnome-desktop-4` |
+| Clipboard | `wl-clipboard`, `cliphist` |
+| File search | `fd`, `fzf` |
+| Desktop | `xdg-utils`, `libnotify`, `gtk3`, `hyprland`, `libpulse`, `jq` |
+| Calculator | `libqalculate` |
+| Fonts | `ttf-material-symbols-variable`, `ttf-jetbrains-mono-nerd`, `ttf-readex-pro` |
+
+**Optional dependencies:**
+- `tesseract` - OCR for screenshot text search
+- `imagemagick` - Alternative thumbnail generation
+- `bitwarden-cli` - Bitwarden password manager plugin
+- `slurp` - Screen region selection
+- `wf-recorder` - Screen recording
+
+</details>
+
+<details>
+<summary><strong>Manual dependency installation</strong></summary>
+
+If you prefer to install dependencies manually:
+
+```bash
+# Using paru (or yay, etc.)
+paru -S quickshell python python-click python-loguru python-tqdm \
+    python-gobject gnome-desktop-4 wl-clipboard cliphist fd fzf \
+    xdg-utils libnotify gtk3 hyprland libpulse jq libqalculate \
+    ttf-material-symbols-variable ttf-jetbrains-mono-nerd ttf-readex-pro
+
+# Optional
+paru -S tesseract imagemagick bitwarden-cli slurp wf-recorder
+```
+
+</details>
+
+### Other Distributions
+
+<details>
+<summary><strong>Fedora / Ubuntu / Debian</strong></summary>
+
+Hamr requires [Quickshell](https://quickshell.outfoxxed.me/) which must be built from source on non-Arch distros. See the [Quickshell documentation](https://quickshell.outfoxxed.me/docs/getting-started/installation/) for build instructions.
+
+Once Quickshell is installed, clone Hamr and install dependencies manually:
+
+```bash
+git clone https://github.com/stewart86/hamr.git
+cd hamr
+
+# Create config directories
+mkdir -p ~/.config/quickshell ~/.config/hamr/plugins
+ln -s "$(pwd)" ~/.config/quickshell/hamr
+
+# Install Python dependencies
+pip install click loguru tqdm PyGObject
+
+# Install system packages (example for Fedora)
+sudo dnf install fd-find fzf wl-clipboard jq qalculate
+
+# Install fonts (see font section below)
+```
+
+</details>
+
+<details>
+<summary><strong>Font Installation (Non-Arch)</strong></summary>
 
 | Font | Purpose |
 |------|---------|
 | **Material Symbols Rounded** | Icons throughout the UI |
 | **JetBrains Mono NF** | Monospace text and Nerd Font icons |
-| **Google Sans Flex** | Main UI text |
 | **Readex Pro** | Reading/content text |
-| **Space Grotesk** | Expressive text elements |
 
-<details>
-<summary><strong>Arch Linux / CachyOS / EndeavourOS</strong></summary>
-
-```bash
-# From official repos
-sudo pacman -S ttf-jetbrains-mono-nerd ttf-material-symbols-variable-git
-
-# From AUR (using yay or paru)
-yay -S ttf-google-sans ttf-readex-pro ttf-space-grotesk
-```
-
-</details>
-
-<details>
-<summary><strong>Fedora</strong></summary>
-
-```bash
-# JetBrains Mono Nerd Font
-sudo dnf install jetbrains-mono-fonts
-
-# For other fonts, download from Google Fonts and install manually:
-# - https://fonts.google.com/specimen/Google+Sans+Flex (or use Product Sans)
-# - https://fonts.google.com/specimen/Readex+Pro
-# - https://fonts.google.com/specimen/Space+Grotesk
-# - https://github.com/google/material-design-icons/tree/master/variablefont
-
-# Install downloaded fonts:
-mkdir -p ~/.local/share/fonts
-cp *.ttf ~/.local/share/fonts/
-fc-cache -fv
-```
-
-</details>
-
-<details>
-<summary><strong>Ubuntu / Debian</strong></summary>
-
-```bash
-# JetBrains Mono (Nerd Font version from GitHub releases)
-wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/JetBrainsMono.zip
-unzip JetBrainsMono.zip -d ~/.local/share/fonts/JetBrainsMono
-fc-cache -fv
-
-# For other fonts, download from Google Fonts:
-# - https://fonts.google.com/specimen/Readex+Pro
-# - https://fonts.google.com/specimen/Space+Grotesk
-# - Material Symbols: https://github.com/google/material-design-icons/tree/master/variablefont
-
-mkdir -p ~/.local/share/fonts
-# Copy downloaded .ttf files to ~/.local/share/fonts/
-fc-cache -fv
-```
-
-</details>
-
-<details>
-<summary><strong>NixOS</strong></summary>
-
-```nix
-# In configuration.nix or home-manager
-fonts.packages = with pkgs; [
-  jetbrains-mono
-  nerd-fonts.jetbrains-mono
-  material-symbols
-  # Google Sans Flex may need to be installed manually
-];
-```
-
-</details>
-
-<details>
-<summary><strong>Manual Installation (Any Distro)</strong></summary>
-
-Download fonts from:
+Download from:
 - [JetBrains Mono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases) - Download `JetBrainsMono.zip`
-- [Material Symbols](https://github.com/google/material-design-icons/tree/master/variablefont) - Download the variable font
+- [Material Symbols](https://github.com/google/material-design-icons/tree/master/variablefont)
 - [Readex Pro](https://fonts.google.com/specimen/Readex+Pro)
-- [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk)
-- Google Sans Flex - Part of Google's proprietary fonts; alternatives: [Product Sans](https://befonts.com/product-sans-font.html) or use system sans-serif
 
 ```bash
-# Install to user fonts directory
 mkdir -p ~/.local/share/fonts
-cp *.ttf ~/.local/share/fonts/
+# Extract/copy downloaded fonts to ~/.local/share/fonts/
 fc-cache -fv
-
-# Verify installation
-fc-list | grep -i "JetBrains\|Material\|Readex\|Space Grotesk"
 ```
 
 </details>
 
-### Steps
+### Post-Installation Setup
 
-```bash
-# 1. Clone and copy to Quickshell config
-git clone https://github.com/stewart86/hamr.git
-mkdir -p ~/.config/quickshell
-cp -r hamr ~/.config/quickshell/hamr
-
-# 2. Symlink plugins
-mkdir -p ~/.config/hamr
-ln -s ~/.config/quickshell/hamr/plugins ~/.config/hamr/plugins
-
-# 3. Start Quickshell (runs in background, launcher is hidden by default)
-qs -c hamr
-```
-
-**4. Add Hyprland keybinding (required)**
+**1. Add Hyprland keybinding (required)**
 
 Hamr starts hidden and listens for a toggle signal. Add this to `~/.config/hypr/hyprland.conf`:
 
@@ -253,13 +235,32 @@ bind = Super, Super_L, global, quickshell:hamrToggle
 # bind = Ctrl, Space, global, quickshell:hamrToggle
 ```
 
-After adding the keybinding, reload Hyprland (`hyprctl reload`) and press your keybind to open Hamr.
+**2. Start Hamr**
 
-**5. (Optional) Auto-start with Hyprland**
+```bash
+qs -c hamr
+```
+
+After starting, press your keybind (e.g., Super key) to open Hamr.
+
+**3. (Optional) Auto-start with Hyprland**
 
 Add to `~/.config/hypr/hyprland.conf`:
 ```bash
 exec-once = qs -c hamr
+```
+
+### Updating
+
+```bash
+cd /path/to/hamr
+./install.sh --update
+```
+
+### Uninstalling
+
+```bash
+./install.sh --uninstall
 ```
 
 <details>
@@ -268,9 +269,21 @@ exec-once = qs -c hamr
 **"I ran `qs -c hamr` but nothing appears"**
 
 This is expected. Hamr starts hidden and waits for a toggle signal. Make sure you:
-1. Added the keybinding to `~/.config/hypr/hyprland.conf` (see step 4 above)
+1. Added the keybinding to `~/.config/hypr/hyprland.conf`
 2. Reloaded Hyprland config: `hyprctl reload`
 3. Press your keybind (e.g., Super key or Ctrl+Space)
+
+**Check dependencies**
+
+```bash
+./install.sh --check
+```
+
+**View logs**
+
+```bash
+journalctl --user -u quickshell -f
+```
 
 **Warning about missing `colors.json`**
 
@@ -320,7 +333,13 @@ Hamr uses Material Design colors from `~/.local/state/user/generated/colors.json
 
 ## Creating Plugins
 
-Plugins live in `~/.config/hamr/plugins/`. Each plugin is either:
+Hamr loads plugins from two locations:
+- **Built-in plugins**: `<hamr>/plugins/` - Included with Hamr, read-only
+- **User plugins**: `~/.config/hamr/plugins/` - Your custom plugins
+
+User plugins with the same name as built-in plugins will override them.
+
+Each plugin is either:
 - A **folder** with `manifest.json` + handler executable (multi-step plugins)
 - An **executable script** (simple one-shot actions)
 
@@ -586,15 +605,22 @@ Terms naturally age out based on frecency, so your shortcuts stay relevant as ha
 <summary><strong>File Structure</strong></summary>
 
 ```
-~/.config/quickshell/hamr/
+~/.config/quickshell/hamr/       # Symlink to cloned repo
 ├── shell.qml                    # Entry point
 ├── GlobalStates.qml             # UI state
-├── plugins/                     # Built-in plugins
+├── plugins/                     # Built-in plugins (read-only)
 ├── modules/
 │   ├── common/                  # Appearance, Config, widgets
 │   ├── launcher/                # Launcher UI components
 │   └── imageBrowser/            # Image browser UI
-└── services/                    # LauncherSearch, WorkflowRunner, etc.
+├── services/                    # LauncherSearch, PluginRunner, etc.
+└── scripts/                     # Thumbnail generation, OCR indexing
+
+~/.config/hamr/
+├── plugins/                     # User plugins (override built-in)
+├── config.json                  # User configuration
+├── quicklinks.json              # Custom quicklinks
+└── search-history.json          # Search history (auto-generated)
 ```
 
 </details>

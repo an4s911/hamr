@@ -16,9 +16,9 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    property string thumbgenScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/thumbnails/thumbgen-venv.sh`
+    property string thumbgenScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/thumbnails/thumbgen.sh`
     property string generateThumbnailsMagickScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/thumbnails/generate-thumbnails-magick.sh`
-    property string ocrIndexScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/ocr/ocr-index-venv.sh`
+    property string ocrIndexScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/ocr/ocr-index.sh`
     property alias directory: folderModel.folder
     readonly property string effectiveDirectory: FileUtils.trimFileProtocol(folderModel.folder.toString())
     property url defaultFolder: Qt.resolvedUrl(Directories.defaultWallpaperDir)

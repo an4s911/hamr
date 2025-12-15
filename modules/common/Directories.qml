@@ -22,6 +22,7 @@ Singleton {
     // Shell paths (relative to hamr installation)
     property string assetsPath: Quickshell.shellPath("assets")
     property string scriptPath: Quickshell.shellPath("scripts")
+    property string builtinPlugins: Quickshell.shellPath("plugins")
     
     // Hamr config folder: ~/.config/hamr/
     property string hamrConfig: FileUtils.trimFileProtocol(`${Directories.config}/hamr`)

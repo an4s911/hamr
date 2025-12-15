@@ -76,35 +76,61 @@ Singleton {
 
     // ==================== PLUGIN DISCOVERY ====================
     
-    // Loaded plugins from plugins/ directory
-    // Each plugin: { id, path, manifest: { name, description, icon, ... } }
+    // Loaded plugins from both built-in and user plugins directories
+    // Each plugin: { id, path, manifest: { name, description, icon, ... }, isBuiltin: bool }
+    // User plugins override built-in plugins with the same id
     property var plugins: []
     property var pendingManifestLoads: []
     property bool pluginsLoaded: false  // True when all manifests have been loaded
     property string pendingPluginStart: ""  // Plugin ID to start once loaded
+    property bool builtinFolderReady: false
+    property bool userFolderReady: false
     
     // Force refresh plugins - call this when launcher opens to detect new plugins
     // This works around FolderListModel not detecting changes in symlinked directories
     function refreshPlugins() {
-        // Touch the folder property to force FolderListModel to re-scan
-        const currentFolder = pluginsFolder.folder;
-        pluginsFolder.folder = "";
-        pluginsFolder.folder = currentFolder;
+        // Touch folder properties to force re-scan
+        const builtinFolder = builtinPluginsFolder.folder;
+        const userFolder = userPluginsFolder.folder;
+        builtinPluginsFolder.folder = "";
+        userPluginsFolder.folder = "";
+        builtinPluginsFolder.folder = builtinFolder;
+        userPluginsFolder.folder = userFolder;
     }
     
-    // Load plugins when directory changes
+    // Load plugins from both directories
+    // User plugins override built-in plugins with the same id
     function loadPlugins() {
+        if (!root.builtinFolderReady || !root.userFolderReady) return;
+        
         root.pendingManifestLoads = [];
         root.pluginsLoaded = false;
         
-        for (let i = 0; i < pluginsFolder.count; i++) {
-            const fileName = pluginsFolder.get(i, "fileName");
-            const filePath = pluginsFolder.get(i, "filePath");
+        const seenIds = new Set();
+        
+        // Load user plugins first (higher priority)
+        for (let i = 0; i < userPluginsFolder.count; i++) {
+            const fileName = userPluginsFolder.get(i, "fileName");
+            const filePath = userPluginsFolder.get(i, "filePath");
             if (fileName && filePath) {
-                const dirPath = FileUtils.trimFileProtocol(filePath);
+                seenIds.add(fileName);
                 root.pendingManifestLoads.push({
                     id: fileName,
-                    path: dirPath
+                    path: FileUtils.trimFileProtocol(filePath),
+                    isBuiltin: false
+                });
+            }
+        }
+        
+        // Load built-in plugins (skip if user has same id)
+        for (let i = 0; i < builtinPluginsFolder.count; i++) {
+            const fileName = builtinPluginsFolder.get(i, "fileName");
+            const filePath = builtinPluginsFolder.get(i, "filePath");
+            if (fileName && filePath && !seenIds.has(fileName)) {
+                root.pendingManifestLoads.push({
+                    id: fileName,
+                    path: FileUtils.trimFileProtocol(filePath),
+                    isBuiltin: true
                 });
             }
         }
@@ -114,7 +140,6 @@ Singleton {
         if (root.pendingManifestLoads.length > 0) {
             loadNextManifest();
         } else {
-            // No plugins to load - mark as loaded immediately
             root.pluginsLoaded = true;
         }
     }
@@ -134,6 +159,7 @@ Singleton {
         const plugin = root.pendingManifestLoads.shift();
         manifestLoader.pluginId = plugin.id;
         manifestLoader.pluginPath = plugin.path;
+        manifestLoader.isBuiltin = plugin.isBuiltin;
         manifestLoader.command = ["cat", plugin.path + "/manifest.json"];
         manifestLoader.running = true;
     }
@@ -151,6 +177,8 @@ Singleton {
             }
         }
         
+        property bool isBuiltin: false
+        
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 0 && manifestLoader.outputBuffer.trim()) {
                 try {
@@ -163,7 +191,8 @@ Singleton {
                         updated.push({
                             id: manifestLoader.pluginId,
                             path: manifestLoader.pluginPath,
-                            manifest: manifest
+                            manifest: manifest,
+                            isBuiltin: manifestLoader.isBuiltin
                         });
                         root.plugins = updated;
                     }
@@ -177,9 +206,25 @@ Singleton {
         }
     }
     
-    // Watch for plugin folders
+    // Watch for built-in plugin folders
     FolderListModel {
-        id: pluginsFolder
+        id: builtinPluginsFolder
+        folder: Qt.resolvedUrl(Directories.builtinPlugins)
+        showDirs: true
+        showFiles: false
+        showHidden: false
+        sortField: FolderListModel.Name
+        onStatusChanged: {
+            if (status === FolderListModel.Ready) {
+                root.builtinFolderReady = true;
+                root.loadPlugins();
+            }
+        }
+    }
+    
+    // Watch for user plugin folders
+    FolderListModel {
+        id: userPluginsFolder
         folder: Qt.resolvedUrl(Directories.userPlugins)
         showDirs: true
         showFiles: false
@@ -188,6 +233,7 @@ Singleton {
         onCountChanged: root.loadPlugins()
         onStatusChanged: {
             if (status === FolderListModel.Ready) {
+                root.userFolderReady = true;
                 root.loadPlugins();
             }
         }
@@ -199,8 +245,8 @@ Singleton {
      
      // Start a plugin
      function startPlugin(pluginId) {
-         // Queue if plugins not loaded yet (or still loading - count 0 but folder not ready)
-         if (!root.pluginsLoaded || (root.plugins.length === 0 && pluginsFolder.status !== FolderListModel.Ready)) {
+         // Queue if plugins not loaded yet (or still loading)
+         if (!root.pluginsLoaded || !root.builtinFolderReady || !root.userFolderReady) {
              root.pendingPluginStart = pluginId;
              return true;  // Return true to indicate it will start
          }
