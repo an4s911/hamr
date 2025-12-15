@@ -2,7 +2,7 @@
 
 > "When all you have is a hammer, everything looks like a nail"
 
-Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quickshell.outfoxxed.me/). Extend it with plugins written in Python using a simple JSON protocol.
+Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quickshell.outfoxxed.me/). Extend it with plugins in any language using a simple JSON protocol.
 
 ![Hamr Demo](assets/recording/hamr-demo.gif)
 
@@ -15,12 +15,47 @@ Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quic
 **Unified search across everything** - Apps, emojis, and more in one place. Fuzzy matching highlights what you're looking for, with app descriptions and running window indicators.
 
 ![Hamr Plugins](assets/screenshots/hamr-plugins.png)
-**Extensible plugin system** - Type `/` to browse all available plugins. From Bitwarden passwords to AI-powered plugin creation, each plugin is a simple Python script.
+**Extensible plugin system** - Type `/` to browse all available plugins. From Bitwarden passwords to AI-powered plugin creation, each plugin communicates via simple JSON over stdin/stdout.
 
 ![Hamr Clipboard](assets/screenshots/hamr-clipboard.png)
 **Clipboard history with image previews** - Type `;` to search your clipboard history. Images show thumbnails, and each entry has quick copy/delete actions.
 
-## Compatibility
+## Platform Support
+
+| Platform | Support | Notes |
+|----------|---------|-------|
+| **Hyprland** | Full | Primary target, all features work |
+| **Other Wayland compositors** | Not supported | Would require significant refactoring (see below) |
+| **X11** | Not supported | Quickshell is Wayland-only |
+| **Windows / macOS** | Not supported | Quickshell is Linux-only; Wayland doesn't exist on these platforms |
+
+<details>
+<summary><strong>Why Hyprland-only?</strong></summary>
+
+Hamr relies on Hyprland-specific APIs throughout its codebase:
+
+| Component | Hyprland Dependency |
+|-----------|---------------------|
+| Focus management | `HyprlandFocusGrab` for keyboard/mouse capture |
+| Monitor detection | `Hyprland.focusedMonitor`, `HyprlandMonitor` |
+| Session tracking | `HYPRLAND_INSTANCE_SIGNATURE` environment variable |
+| Keybindings | `bind = Super, Super_L, global, quickshell:hamrToggle` |
+
+**Plugins also use Wayland-specific tools:**
+- `wl-copy` / `wl-paste` for clipboard
+- `cliphist` for clipboard history
+- `grim` + `slurp` for screenshots
+- `wf-recorder` for screen recording
+
+Porting to other Wayland compositors (Sway, River, KDE Plasma) would require:
+1. Replacing all `Quickshell.Hyprland` imports with compositor-agnostic alternatives
+2. Implementing generic focus grabbing (no standard Wayland protocol exists)
+3. Rewriting monitor detection logic
+4. Updating keybind documentation for each compositor
+
+This is a non-trivial effort and not currently planned.
+
+</details>
 
 Hamr works standalone but is **best used alongside [end-4's illogical-impulse](https://github.com/end-4/dots-hyprland)** dotfiles. Many built-in plugins (wallpaper switching, theme toggling, etc.) are designed to integrate with illogical-impulse's theming system.
 
@@ -34,7 +69,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 - **Learned search affinity** - System learns your search shortcuts (type "q" to find QuickLinks if that's how you found it before)
 - **Intent detection** - Auto-detects URLs, math expressions, and commands
 - **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort), includes desktop entry keywords (e.g., "whatsapp" finds ZapZap)
-- **Extensible plugins** - Python handlers with simple JSON protocol
+- **Extensible plugins** - Language-agnostic handlers with simple JSON protocol (Python, Bash, Go, Rust, etc.)
 - **History tracking** - Search, plugin actions, and shell command history
 - **Draggable & persistent position** - Drag the launcher anywhere on screen; position remembered across sessions
 
