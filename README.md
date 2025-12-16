@@ -72,6 +72,7 @@ Hamr is extracted and adapted from [end-4's illogical-impulse](https://github.co
 - **Extensible plugins** - Language-agnostic handlers with simple JSON protocol (Python, Bash, Go, Rust, etc.)
 - **History tracking** - Search, plugin actions, and shell command history
 - **Draggable & persistent position** - Drag the launcher anywhere on screen; position remembered across sessions
+- **State restoration** - Click outside to dismiss, reopen within 30s to resume where you left off (configurable)
 
 ### Prefix Shortcuts
 
@@ -646,6 +647,9 @@ Hamr is configured via `~/.config/hamr/config.json`. The install script creates 
     "terminalArgs": "--class=floating.terminal",
     "shell": "zsh"
   },
+  "behavior": {
+    "stateRestoreWindowMs": 30000
+  },
   "search": {
     "nonAppResultDelay": 30,
     "debounceMs": 50,
@@ -719,6 +723,7 @@ Hamr is configured via `~/.config/hamr/config.json`. The install script creates 
 | **Apps** | `terminal` | `ghostty` | Terminal emulator for shell commands |
 | | `terminalArgs` | `--class=floating.terminal` | Arguments passed to terminal |
 | | `shell` | `zsh` | Shell for command execution (zsh, bash, fish) |
+| **Behavior** | `stateRestoreWindowMs` | `30000` | Time (ms) to preserve state after soft close (0 to disable) |
 | **Search** | `maxDisplayedResults` | `16` | Maximum results shown in launcher |
 | | `maxRecentItems` | `20` | Recent history items on empty search |
 | | `shellHistoryLimit` | `50` | Shell history results limit |

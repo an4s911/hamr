@@ -37,6 +37,10 @@ ShellRoot {
         target: "hamr"
 
         function toggle() {
+            if (GlobalStates.launcherOpen) {
+                // Toggle off - soft close (preserves state for restore window)
+                GlobalStates.softClose = true
+            }
             GlobalStates.launcherOpen = !GlobalStates.launcherOpen
         }
 
@@ -45,6 +49,8 @@ ShellRoot {
         }
 
         function close() {
+            // Explicit close request - hard close
+            GlobalStates.softClose = false
             GlobalStates.launcherOpen = false
         }
 
@@ -67,13 +73,23 @@ ShellRoot {
     GlobalShortcut {
         name: "hamrToggle"
         description: "Toggle Hamr launcher"
-        onPressed: GlobalStates.launcherOpen = !GlobalStates.launcherOpen
+        onPressed: {
+            if (GlobalStates.launcherOpen) {
+                // Toggle off - soft close (preserves state for restore window)
+                GlobalStates.softClose = true
+            }
+            GlobalStates.launcherOpen = !GlobalStates.launcherOpen
+        }
     }
 
     GlobalShortcut {
         name: "hamrToggleRelease"
         description: "Toggle Hamr on key release"
         onReleased: {
+            if (GlobalStates.launcherOpen) {
+                // Toggle off - soft close (preserves state for restore window)
+                GlobalStates.softClose = true
+            }
             GlobalStates.launcherOpen = !GlobalStates.launcherOpen
         }
     }

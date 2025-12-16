@@ -14,6 +14,9 @@ import Quickshell.Hyprland
 Scope {
     id: launcherScope
     property bool dontAutoCancelSearch: false
+    
+    // Track if state is pending cleanup (soft close occurred, waiting for timeout or reopen)
+    property bool statePendingCleanup: false
 
     // Write launch timestamp for plugins that need to know when hamr was opened
     // (e.g., screenrecord plugin uses this to trim the end of recordings)
@@ -21,12 +24,84 @@ Scope {
         id: launchTimestampProc
         command: ["bash", "-c", "mkdir -p ~/.cache/hamr && date +%s%3N > ~/.cache/hamr/launch_timestamp"]
     }
+    
+    // Deferred cleanup timer for soft close (click-outside)
+    // When timer fires, actually clean up state
+    Timer {
+        id: deferredCleanupTimer
+        interval: Config.options.behavior.stateRestoreWindowMs
+        repeat: false
+        onTriggered: {
+            // Timer expired - perform actual cleanup
+            if (PluginRunner.isActive()) {
+                LauncherSearch.closePlugin();
+            }
+            if (LauncherSearch.isInExclusiveMode()) {
+                LauncherSearch.exclusiveMode = "";
+            }
+            launcherScope.statePendingCleanup = false;
+        }
+    }
+    
+    // Perform immediate cleanup (hard close)
+    function performImmediateCleanup() {
+        deferredCleanupTimer.stop();
+        if (PluginRunner.isActive()) {
+            LauncherSearch.closePlugin();
+        }
+        if (LauncherSearch.isInExclusiveMode()) {
+            LauncherSearch.exclusiveMode = "";
+        }
+        launcherScope.statePendingCleanup = false;
+    }
 
     Connections {
         target: GlobalStates
         function onLauncherOpenChanged() {
             if (GlobalStates.launcherOpen) {
                 launchTimestampProc.running = true;
+                
+                // === OPENING (single handler, not per-screen) ===
+                if (launcherScope.statePendingCleanup) {
+                    // Reopening within restore window - cancel cleanup, preserve state
+                    deferredCleanupTimer.stop();
+                    launcherScope.statePendingCleanup = false;
+                } else if (!launcherScope.dontAutoCancelSearch) {
+                    // Normal open - start fresh
+                    launcherScope.cancelSearchOnAllScreens();
+                }
+            } else {
+                // === CLOSING (single handler, not per-screen) ===
+                const restoreWindowMs = Config.options.behavior.stateRestoreWindowMs;
+                
+                if (GlobalStates.softClose && restoreWindowMs > 0) {
+                    // Soft close (click-outside): defer cleanup, allow state restore
+                    launcherScope.statePendingCleanup = true;
+                    deferredCleanupTimer.restart();
+                } else {
+                    // Hard close (Escape, execute-with-close, etc.): immediate cleanup
+                    launcherScope.performImmediateCleanup();
+                }
+                
+                // Reset softClose flag for next close
+                GlobalStates.softClose = false;
+                
+                // Reset dontAutoCancelSearch
+                launcherScope.dontAutoCancelSearch = false;
+                
+                // Hide action hint
+                GlobalStates.hideActionHint();
+            }
+        }
+    }
+    
+    // Helper to cancel search - needs to call into the correct screen's searchWidget
+    function cancelSearchOnAllScreens() {
+        for (let i = 0; i < launcherVariants.instances.length; i++) {
+            let panelWindow = launcherVariants.instances[i];
+            if (panelWindow.monitorIsFocused) {
+                panelWindow.searchWidget.cancelSearch();
+                break;
             }
         }
     }
@@ -40,6 +115,7 @@ Scope {
             property string searchingText: ""
             readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.screen)
             property bool monitorIsFocused: (Hyprland.focusedMonitor?.id == monitor?.id)
+            property alias searchWidget: searchWidget  // Expose for outer scope access
             screen: modelData
             visible: GlobalStates.launcherOpen && monitorIsFocused
 
@@ -74,23 +150,11 @@ Scope {
                 target: GlobalStates
                 function onLauncherOpenChanged() {
                     if (!GlobalStates.launcherOpen) {
+                        // Per-screen UI cleanup on close
                         searchWidget.disableExpandAnimation();
-                        launcherScope.dontAutoCancelSearch = false;
                         grab.active = false;
-                        // Clear plugin state when closing
-                        if (PluginRunner.isActive()) {
-                            LauncherSearch.closePlugin();
-                        }
-                        // Clear exclusive mode when closing
-                        if (LauncherSearch.isInExclusiveMode()) {
-                            LauncherSearch.exclusiveMode = "";
-                        }
-                        // Hide action hint
-                        GlobalStates.hideActionHint();
                     } else {
-                        if (!launcherScope.dontAutoCancelSearch) {
-                            searchWidget.cancelSearch();
-                        }
+                        // Per-screen UI setup on open
                         if (!GlobalStates.imageBrowserOpen) {
                             delayedGrabTimer.start();
                         }
@@ -103,7 +167,9 @@ Scope {
                 target: PluginRunner
                 function onExecuteCommand(command) {
                     if (command.close) {
+                        // Hard close - task completed, don't preserve state
                         LauncherSearch.closePlugin();
+                        GlobalStates.softClose = false;
                         GlobalStates.launcherOpen = false;
                     }
                 }
@@ -158,10 +224,8 @@ Scope {
 
                         if (mouse.x < widgetMapped.x || mouse.x > widgetMapped.x + columnLayout.width ||
                             mouse.y < widgetMapped.y || mouse.y > widgetMapped.y + columnLayout.height) {
-                            // Click is outside - close
-                            if (PluginRunner.isActive()) {
-                                LauncherSearch.closePlugin();
-                            }
+                            // Click is outside - soft close (preserves state for restore window)
+                            GlobalStates.softClose = true;
                             GlobalStates.launcherOpen = false;
                         }
                     }
@@ -239,6 +303,8 @@ Scope {
                         } else if (LauncherSearch.isInExclusiveMode()) {
                             LauncherSearch.exitExclusiveMode();
                         } else {
+                            // Hard close - user explicitly pressed Escape
+                            GlobalStates.softClose = false;
                             GlobalStates.launcherOpen = false;
                         }
                     }
@@ -303,6 +369,8 @@ Scope {
 
     function toggleClipboard() {
         if (GlobalStates.launcherOpen && launcherScope.dontAutoCancelSearch) {
+            // Toggle off - soft close (preserves state for restore window)
+            GlobalStates.softClose = true;
             GlobalStates.launcherOpen = false;
             return;
         }
@@ -319,6 +387,8 @@ Scope {
 
     function toggleEmojis() {
         if (GlobalStates.launcherOpen && launcherScope.dontAutoCancelSearch) {
+            // Toggle off - soft close (preserves state for restore window)
+            GlobalStates.softClose = true;
             GlobalStates.launcherOpen = false;
             return;
         }

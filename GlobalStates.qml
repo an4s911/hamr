@@ -13,6 +13,10 @@ Singleton {
     property bool launcherOpen: false
     property bool superReleaseMightTrigger: true
     
+    // Soft close: click-outside (preserves state for restore window)
+    // Hard close: Escape, execute-with-close, IPC close (immediate cleanup)
+    property bool softClose: false
+    
     // Unified image browser that can be opened in standalone or plugin mode
     property bool imageBrowserOpen: false
      property var imageBrowserConfig: null  // { directory, title, extensions, actions, workflowId }

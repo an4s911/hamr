@@ -127,6 +127,14 @@ Singleton {
                 property int sidebarWidth: 140 // Quick dirs sidebar width
             }
 
+            // ==================== BEHAVIOR ====================
+            property JsonObject behavior: JsonObject {
+                // Time window (ms) to preserve state after soft close (click-outside)
+                // Reopening within this window restores previous view
+                // Set to 0 to disable (always start fresh)
+                property int stateRestoreWindowMs: 30000  // 30 seconds
+            }
+
             // ==================== APPEARANCE ====================
             property JsonObject appearance: JsonObject {
                 // Transparency (0.0 = opaque, 1.0 = fully transparent)
