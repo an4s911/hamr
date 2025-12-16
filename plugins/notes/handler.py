@@ -326,6 +326,7 @@ def main():
                             "context": "",
                             "placeholder": "Search notes...",
                             "pluginActions": get_plugin_actions(),
+                            "navigateBack": True,
                         }
                     )
                 else:
@@ -360,6 +361,7 @@ def main():
                             "context": "",
                             "placeholder": "Search notes...",
                             "pluginActions": get_plugin_actions(),
+                            "navigateBack": True,
                         }
                     )
                 else:

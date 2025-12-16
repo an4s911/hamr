@@ -328,6 +328,7 @@ def main():
                             "context": "",
                             "placeholder": "Search snippets...",
                             "pluginActions": get_plugin_actions(),
+                            "navigateBack": True,
                         }
                     )
                 )
@@ -362,6 +363,7 @@ def main():
                             "context": "",
                             "placeholder": "Search snippets...",
                             "pluginActions": get_plugin_actions(),
+                            "navigateBack": True,
                         }
                     )
                 )
