@@ -13,11 +13,6 @@ Singleton {
         NONE: 0
     })
     
-    property real frecencyBoostFactor: 50
-    property real maxFrecencyBoost: 500
-    property int termMatchExactBoost: 5000
-    property int termMatchPrefixBoost: 3000
-    
     function getFrecencyScore(historyItem) {
         if (!historyItem) return 0;
         const now = Date.now();
@@ -41,43 +36,29 @@ Singleton {
         return root.matchType.FUZZY;
     }
     
-    function compareResults(a, b) {
-        const aIsExact = a.matchType === root.matchType.EXACT;
-        const bIsExact = b.matchType === root.matchType.EXACT;
+    // Single composite score for efficient sorting (avoids multi-field comparison)
+    // fuzzyScore is in 0-1 range (normalized), frecency is typically 0-50
+    function getCompositeScore(matchType, fuzzyScore, frecency) {
+        // Base score from fuzzy match (0-1 range, scale up for precision)
+        let score = fuzzyScore * 1000;
         
-        if (aIsExact !== bIsExact) {
-            return aIsExact ? -1 : 1;
+        // Match type bonuses (moderate - shouldn't completely override good fuzzy scores)
+        if (matchType === root.matchType.EXACT) {
+            score += 500;  // Exact history term match
+        } else if (matchType === root.matchType.PREFIX) {
+            score += 200;
         }
         
-        if (aIsExact && bIsExact) {
-            if (Math.abs(a.frecency - b.frecency) > 1) {
-                return b.frecency - a.frecency;
-            }
-            return b.fuzzyScore - a.fuzzyScore;
-        }
+        // Frecency bonus (scaled appropriately)
+        // frecency typically ranges 0-50 (count * recencyMultiplier)
+        // Cap at 300 to not overwhelm fuzzy score differences
+        score += Math.min(frecency * 5, 300);
         
-        if (a.fuzzyScore !== b.fuzzyScore) {
-            return b.fuzzyScore - a.fuzzyScore;
-        }
-        return b.frecency - a.frecency;
+        return score;
     }
     
-    function getCombinedScore(fuzzyScore, frecencyBoost) {
-        const boost = Math.min(frecencyBoost * root.frecencyBoostFactor, root.maxFrecencyBoost);
-        return fuzzyScore + boost;
-    }
-    
-    function getTermMatchBoost(recentTerms, query) {
-        const queryLower = query.toLowerCase();
-        let boost = 0;
-        for (const term of recentTerms) {
-            const termLower = term.toLowerCase();
-            if (termLower === queryLower) {
-                return root.termMatchExactBoost;
-            } else if (termLower.startsWith(queryLower)) {
-                boost = Math.max(boost, root.termMatchPrefixBoost);
-            }
-        }
-        return boost;
+    // Compare using composite scores (faster than multi-field comparison)
+    function compareByCompositeScore(a, b) {
+        return b.compositeScore - a.compositeScore;
     }
 }

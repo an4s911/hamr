@@ -33,7 +33,7 @@ Singleton {
      * @param {Object} dependencies - Callback functions and services:
      *   - recordSearch(type, name, query)
      *   - recordWorkflowExecution(actionInfo, searchTerm)
-     *   - recordWindowFocus(appId, appName, windowTitle, iconName)
+     *   - recordWindowFocus(appId, appName, windowTitle, iconName, searchTerm)
      *   - startPlugin(pluginId)
      *   - resultComponent - The LauncherSearchResult component to instantiate
      *   - matchTypeEnum - The match type enum (EXACT, PREFIX, FUZZY, NONE)
@@ -366,7 +366,8 @@ Singleton {
                                 capturedAppId,
                                 capturedItem.name,
                                 currentWindows[0].title,
-                                capturedItem.icon
+                                capturedItem.icon,
+                                capturedQuery
                             );
                             WindowManager.focusWindow(currentWindows[0]);
                             GlobalStates.launcherOpen = false;

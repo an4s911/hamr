@@ -97,8 +97,8 @@ Singleton {
         HistoryManager.recordWorkflowExecution(actionInfo, searchTerm);
     }
     
-    function recordWindowFocus(appId, appName, windowTitle, iconName) {
-        HistoryManager.recordWindowFocus(appId, appName, windowTitle, iconName);
+    function recordWindowFocus(appId, appName, windowTitle, iconName, searchTerm) {
+        HistoryManager.recordWindowFocus(appId, appName, windowTitle, iconName, searchTerm ?? root.query);
     }
     
     function removeHistoryItem(historyType, identifier) {
@@ -355,11 +355,9 @@ Singleton {
          
          const indexedItems = PluginRunner.getAllIndexedItems();
          for (const item of indexedItems) {
-             const searchableText = item.keywords?.length > 0
-                 ? `${item.name} ${item.keywords.join(" ")}`
-                 : item.name;
              items.push({
-                 name: Fuzzy.prepare(searchableText),
+                 name: Fuzzy.prepare(item.name),
+                 keywords: item.keywords?.length > 0 ? Fuzzy.prepare(item.keywords.join(" ")) : null,
                  sourceType: ResultFactory.sourceType.INDEXED_ITEM,
                  id: item.id,
                  data: { item },
@@ -477,8 +475,14 @@ Singleton {
          root.preppedHistorySearchables = items;
      }
     
+    Timer {
+        id: historyRebuildTimer
+        interval: 250  // Debounce history rebuilds (avoids redundant work on rapid changes)
+        onTriggered: root.rebuildHistorySearchables()
+    }
+    
     onSearchHistoryDataChanged: {
-        root.rebuildHistorySearchables();
+        historyRebuildTimer.restart();
     }
     
     property var preppedSearchables: [...preppedStaticSearchables, ...preppedHistorySearchables]
@@ -603,61 +607,96 @@ Singleton {
         stringUtils: StringUtils
     })
     
+    // Helper to get frecency for a searchable item (used by scoreFn)
+    function getFrecencyForSearchable(item) {
+        const data = item.data;
+        if (data.historyItem) {
+            return FrecencyScorer.getFrecencyScore(data.historyItem);
+        }
+        switch (item.sourceType) {
+            case ResultFactory.sourceType.PLUGIN:
+                if (data.isAction) {
+                    return root.getHistoryBoost("action", data.action.action);
+                }
+                return root.getHistoryBoost("workflow", data.plugin.id);
+            case ResultFactory.sourceType.INDEXED_ITEM:
+                if (data.item?.appId) {
+                    return root.getHistoryBoost("app", data.item.appId);
+                }
+                return 0;
+            default:
+                return 0;
+        }
+    }
+    
     function unifiedFuzzySearch(query, limit) {
         if (!query || query.trim() === "") return [];
         
-         const fuzzyResults = Fuzzy.go(query, root.preppedSearchables, {
-             key: "name",
-             limit: limit * 3
-         });
+        // Use multi-field search: name (primary) + keywords (secondary)
+        // scoreFn integrates field weights + frecency into ranking
+        const fuzzyResults = Fuzzy.go(query, root.preppedSearchables, {
+            keys: ["name", "keywords"],
+            limit: limit * 2,
+            threshold: 0.25,  // Reject poor matches early
+            scoreFn: (result) => {
+                const item = result.obj;
+                
+                // Multi-field scoring: name matches weighted higher than keywords
+                const nameScore = result[0]?.score ?? 0;
+                const keywordsScore = result[1]?.score ?? 0;
+                const baseScore = nameScore * 1.0 + keywordsScore * 0.3;
+                
+                // Get frecency boost
+                const frecency = root.getFrecencyForSearchable(item);
+                const frecencyBoost = Math.min(frecency * 0.02, 0.3);  // Cap at 0.3
+                
+                // History term matches get a significant boost
+                const historyBoost = item.isHistoryTerm ? 0.2 : 0;
+                
+                // Combined score
+                return baseScore + frecencyBoost + historyBoost;
+            }
+        });
          
-         const seen = new Map();
-         for (const match of fuzzyResults) {
-             const item = match.obj;
-             const key = `${item.sourceType}:${item.id}`;
-             const existing = seen.get(key);
+        const seen = new Map();
+        for (const match of fuzzyResults) {
+            const item = match.obj;
+            const key = `${item.sourceType}:${item.id}`;
+            const existing = seen.get(key);
              
-             if (!existing || match._score > existing.score) {
-                 seen.set(key, {
-                     score: match._score,
-                     item: item,
-                     isHistoryTerm: item.isHistoryTerm
-                 });
-             }
-         }
+            if (!existing || match.score > existing.score) {
+                seen.set(key, {
+                    score: match.score,  // Use normalized score (includes frecency)
+                    item: item,
+                    isHistoryTerm: item.isHistoryTerm
+                });
+            }
+        }
          
-         return Array.from(seen.values());
-     }
+        return Array.from(seen.values());
+    }
      
     function createResultFromSearchable(item, query, fuzzyScore) {
-         const resultMatchType = item.isHistoryTerm ? FrecencyScorer.matchType.EXACT : FrecencyScorer.matchType.FUZZY;
-         
-         let frecency = 0;
-         const data = item.data;
-         if (data.historyItem) {
-             frecency = FrecencyScorer.getFrecencyScore(data.historyItem);
-         } else {
-             switch (item.sourceType) {
-                 case ResultFactory.sourceType.PLUGIN:
-                     if (data.isAction) {
-                         frecency = root.getHistoryBoost("action", data.action.action);
-                     } else {
-                         frecency = root.getHistoryBoost("workflow", data.plugin.id);
-                     }
-                     break;
-                 case ResultFactory.sourceType.INDEXED_ITEM:
-                     if (data.item?.appId) {
-                         frecency = root.getHistoryBoost("app", data.item.appId);
-                     }
-                     break;
-             }
-         }
+        const resultMatchType = item.isHistoryTerm ? FrecencyScorer.matchType.EXACT : FrecencyScorer.matchType.FUZZY;
         
-        return ResultFactory.createResultFromSearchable(
+        // Frecency is already factored into fuzzyScore via scoreFn,
+        // but we still need it for display/sorting consistency
+        const frecency = root.getFrecencyForSearchable(item);
+        
+        const resultObj = ResultFactory.createResultFromSearchable(
             item, query, fuzzyScore,
             root.resultFactoryDependencies,
             frecency, resultMatchType
         );
+        
+        // Add composite score for efficient sorting
+        if (resultObj) {
+            resultObj.compositeScore = FrecencyScorer.getCompositeScore(
+                resultMatchType, fuzzyScore, frecency
+            );
+        }
+        
+        return resultObj;
     }
     
     property list<var> results: {
@@ -908,7 +947,8 @@ Singleton {
              }
          }
          
-         allResults.sort(FrecencyScorer.compareResults);
+         // Use composite score for faster sorting (single numeric comparison)
+         allResults.sort(FrecencyScorer.compareByCompositeScore);
          
          const webSearchQuery = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.webSearch);
          allResults.push({

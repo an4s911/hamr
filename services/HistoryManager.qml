@@ -163,15 +163,44 @@ Singleton {
         searchHistoryFileView.setText(JSON.stringify({ history: newHistory }, null, 2));
     }
     
-    function recordWindowFocus(appId, appName, windowTitle, iconName) {
+    function recordWindowFocus(appId, appName, windowTitle, iconName, searchTerm) {
         const now = Date.now();
-        // Use appId + windowTitle as unique key
+        let newHistory = searchHistoryData.slice();
+        
+        // Also update the app's history entry with the search term (for frecency)
+        if (searchTerm) {
+            const appIndex = newHistory.findIndex(h => h.type === "app" && h.name === appId);
+            if (appIndex >= 0) {
+                const existing = newHistory[appIndex];
+                let recentTerms = existing.recentSearchTerms || [];
+                recentTerms = recentTerms.filter(t => t !== searchTerm);
+                recentTerms.unshift(searchTerm);
+                recentTerms = recentTerms.slice(0, root.maxRecentSearchTerms);
+                
+                newHistory[appIndex] = {
+                    type: existing.type,
+                    name: existing.name,
+                    count: existing.count + 1,
+                    lastUsed: now,
+                    recentSearchTerms: recentTerms
+                };
+            } else {
+                // Create app entry if it doesn't exist
+                newHistory.unshift({
+                    type: "app",
+                    name: appId,
+                    count: 1,
+                    lastUsed: now,
+                    recentSearchTerms: [searchTerm]
+                });
+            }
+        }
+        
+        // Use appId + windowTitle as unique key for window focus entry
         const key = `windowFocus:${appId}:${windowTitle}`;
-        const existingIndex = searchHistoryData.findIndex(
+        const existingIndex = newHistory.findIndex(
             h => h.type === "windowFocus" && h.key === key
         );
-        
-        let newHistory = searchHistoryData.slice();
         
         if (existingIndex >= 0) {
             const existing = newHistory[existingIndex];
