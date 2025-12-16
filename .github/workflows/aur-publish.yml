@@ -13,14 +13,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install SSH key
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/aur
+          printf '%s\n' "$AUR_SSH_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          echo "Host aur.archlinux.org" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/aur" >> ~/.ssh/config
-          echo "  User aur" >> ~/.ssh/config
-          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            User aur
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Extract version from tag
         id: version
