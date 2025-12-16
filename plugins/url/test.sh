@@ -31,14 +31,16 @@ test_match_subdomain() {
 }
 
 test_copy_action() {
-    local result=$(hamr_test raw --input '{"step": "action", "query": "github.com", "action": "copy"}')
+    # URL is passed via selected.id (as set by search results)
+    local result=$(hamr_test raw --input '{"step": "action", "selected": {"id": "https://github.com"}, "action": "copy"}')
     assert_type "$result" "execute"
     assert_json "$result" '.execute.command[0]' "wl-copy"
     assert_closes "$result"
 }
 
 test_open_action() {
-    local result=$(hamr_test raw --input '{"step": "action", "query": "github.com"}')
+    # URL is passed via selected.id (as set by search results)
+    local result=$(hamr_test raw --input '{"step": "action", "selected": {"id": "https://github.com"}}')
     assert_type "$result" "execute"
     assert_json "$result" '.execute.command[0]' "xdg-open"
     assert_closes "$result"
