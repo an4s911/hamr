@@ -209,11 +209,11 @@ fc-cache -fv
 Hamr starts hidden and listens for a toggle signal. Add this to `~/.config/hypr/hyprland.conf`:
 
 ```bash
-# Toggle Hamr with Super key (tap and release)
-bind = Super, Super_L, global, quickshell:hamrToggle
+# Toggle Hamr with Ctrl+Space
+bind = Ctrl, Space, global, quickshell:hamrToggle
 
-# Or use Ctrl+Space instead
-# bind = Ctrl, Space, global, quickshell:hamrToggle
+# Or use Super+Space
+# bind = Super, Space, global, quickshell:hamrToggle
 ```
 
 **2. Start Hamr**
