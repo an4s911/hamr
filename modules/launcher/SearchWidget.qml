@@ -187,6 +187,18 @@ Item { // Wrapper
                         }
                     }
                     onSelectCurrent: {
+                        // If there's a pending confirmation dialog, Enter confirms it
+                        if (pluginActionBar.pendingConfirmAction !== null) {
+                            const actionId = pluginActionBar.pendingConfirmAction?.id ?? "";
+                            pluginActionBar.pendingConfirmAction = null;
+                            if (actionId) {
+                                // Confirmed actions are typically destructive (wipe, clear)
+                                // They modify the view but don't navigate, so skip depth change
+                                PluginRunner.executePluginAction(actionId, true);
+                            }
+                            return;
+                        }
+                        
                         // If plugin is active in submit mode with user input:
                         // - Default: Enter submits the query
                         // - Exception: if user navigated to a non-first result, Enter selects it
@@ -505,8 +517,9 @@ Item { // Wrapper
                 actions: PluginRunner.pluginActions
                 navigationDepth: PluginRunner.navigationDepth
                 
-                onActionClicked: actionId => {
-                    PluginRunner.executePluginAction(actionId);
+                onActionClicked: (actionId, wasConfirmed) => {
+                    // Confirmed actions (destructive) don't navigate
+                    PluginRunner.executePluginAction(actionId, wasConfirmed);
                 }
                 
                 onBackClicked: {

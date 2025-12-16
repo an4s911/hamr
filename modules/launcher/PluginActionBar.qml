@@ -28,7 +28,8 @@ Item {
     property int navigationDepth: 0
     
     // Signal when an action is clicked (after confirmation if needed)
-    signal actionClicked(string actionId)
+    // wasConfirmed is true if user went through confirmation dialog
+    signal actionClicked(string actionId, bool wasConfirmed)
     
     // Currently showing confirmation for this action
     property var pendingConfirmAction: null
@@ -154,7 +155,7 @@ Item {
                     if (actionBtn.hasConfirm) {
                         root.pendingConfirmAction = actionBtn.modelData;
                     } else {
-                        root.actionClicked(actionBtn.actionId);
+                        root.actionClicked(actionBtn.actionId, false);
                     }
                 }
                 
@@ -271,7 +272,7 @@ Item {
                     const actionId = root.pendingConfirmAction?.id ?? "";
                     root.pendingConfirmAction = null;
                     if (actionId) {
-                        root.actionClicked(actionId);
+                        root.actionClicked(actionId, true);  // Was confirmed
                     }
                 }
                 
@@ -309,7 +310,7 @@ Item {
             const actionId = root.pendingConfirmAction?.id ?? "";
             root.pendingConfirmAction = null;
             if (actionId) {
-                root.actionClicked(actionId);
+                root.actionClicked(actionId, true);  // Was confirmed
             }
             event.accepted = true;
             return;
@@ -323,7 +324,7 @@ Item {
                 if (action.confirm) {
                     root.pendingConfirmAction = action;
                 } else {
-                    root.actionClicked(action.id);
+                    root.actionClicked(action.id, false);
                 }
                 event.accepted = true;
             }

@@ -947,11 +947,15 @@ Singleton {
      
      // Execute a plugin-level action (from toolbar button)
      // These actions (filter, add mode, etc.) increase depth so user can "go back"
-     function executePluginAction(actionId) {
+     // Set skipNavigation=true for confirmed actions (destructive actions that don't navigate)
+     function executePluginAction(actionId, skipNavigation) {
          if (!root.activePlugin) return;
          
          // Plugin actions increase depth (user can press Escape to go back)
-         root.pendingNavigation = true;
+         // Unless skipNavigation is true (for confirmed destructive actions)
+         if (!skipNavigation) {
+             root.pendingNavigation = true;
+         }
          
          const input = {
              step: "action",
@@ -1121,17 +1125,22 @@ Singleton {
          const isViewResponse = ["results", "card", "form"].includes(response.type);
          if (isViewResponse) {
              const hasNavDepth = response.navigationDepth !== undefined && response.navigationDepth !== null;
+             // Check if plugin explicitly set navigation flags (can override pending flags)
+             const hasExplicitForward = response.navigateForward !== undefined;
+             const hasExplicitBack = response.navigateBack !== undefined;
              
-             if (hasNavDepth) {
+              if (hasNavDepth) {
                  // Explicit absolute depth (for jumping multiple levels)
                  root.navigationDepth = Math.max(0, parseInt(response.navigationDepth, 10));
-             } else if (response.navigateBack === true || root.pendingBack) {
+             } else if (response.navigateBack === true || (!hasExplicitBack && root.pendingBack)) {
                  // Back navigation - decrement depth
+                 // Plugin's explicit navigateBack overrides pendingBack
                  root.navigationDepth = Math.max(0, root.navigationDepth - 1);
-             } else if (response.navigateForward === true || root.pendingNavigation) {
-                 // Forward navigation - increment depth
-                 root.navigationDepth++;
-             }
+              } else if (response.navigateForward === true || (!hasExplicitForward && root.pendingNavigation)) {
+                  // Forward navigation - increment depth
+                  // Plugin's explicit navigateForward overrides pendingNavigation
+                  root.navigationDepth++;
+              }
              // No flag = no depth change (action modified view, didn't navigate)
          }
          root.pendingNavigation = false;

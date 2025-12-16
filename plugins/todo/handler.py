@@ -152,6 +152,7 @@ def respond(
     placeholder: str = "Search tasks...",
     input_mode: str = "realtime",
     plugin_actions: list[dict] | None = None,
+    navigate_forward: bool | None = None,
 ):
     """Send a results response"""
     response = {
@@ -166,6 +167,9 @@ def respond(
         response["clearInput"] = True
     if context:
         response["context"] = context
+    # Explicit navigation control - override core's pendingNavigation
+    if navigate_forward is not None:
+        response["navigateForward"] = navigate_forward
     if refresh_ui:
         refresh_sidebar()
     print(json.dumps(response))
@@ -308,7 +312,7 @@ def main():
                 return
 
             if action == "clear_completed":
-                # Remove all completed todos
+                # Remove all completed todos - this is a modification, not navigation
                 todos = [t for t in todos if not t.get("done", False)]
                 save_todos(todos)
                 respond(
@@ -316,6 +320,7 @@ def main():
                     refresh_ui=True,
                     clear_input=True,
                     plugin_actions=get_plugin_actions(todos),
+                    navigate_forward=False,  # Override pendingNavigation
                 )
                 return
 
@@ -340,6 +345,7 @@ def main():
             return
 
         # Add task (content encoded in ID)
+        # This is a modification, not navigation - don't increase depth
         if item_id.startswith("__add__:"):
             encoded = item_id.split(":", 1)[1]
             if encoded:
@@ -358,6 +364,7 @@ def main():
                         refresh_ui=True,
                         clear_input=True,
                         plugin_actions=get_plugin_actions(todos),
+                        navigate_forward=False,  # Override pendingNavigation
                     )
                     return
                 except Exception:
@@ -365,6 +372,7 @@ def main():
             respond(
                 get_todo_results(todos),
                 plugin_actions=get_plugin_actions(todos),
+                navigate_forward=False,  # Override pendingNavigation
             )
             return
 
@@ -409,6 +417,7 @@ def main():
 
             if action == "toggle" or not action:
                 # Toggle done (default click action)
+                # This is a modification, not navigation - don't increase depth
                 if 0 <= todo_idx < len(todos):
                     todos[todo_idx]["done"] = not todos[todo_idx].get("done", False)
                     save_todos(todos)
@@ -416,6 +425,7 @@ def main():
                         get_todo_results(todos),
                         refresh_ui=True,
                         plugin_actions=get_plugin_actions(todos),
+                        navigate_forward=False,  # Override pendingNavigation
                     )
                 return
 
