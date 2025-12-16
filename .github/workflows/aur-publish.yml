@@ -94,8 +94,8 @@ jobs:
           sed -i "s/pkgver = .*/pkgver = ${{ steps.version.outputs.version }}/" .SRCINFO
           
           git add PKGBUILD .SRCINFO hamr.install
-          git commit -m "Update to ${{ steps.version.outputs.version }}"
-          git push
+          git diff --cached --quiet || git commit -m "Update to ${{ steps.version.outputs.version }}"
+          git push || true
 
       - name: Generate release notes
         id: release_notes
