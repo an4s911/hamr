@@ -20,7 +20,7 @@ Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quic
 
 - **Frecency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))
 - **Learned search affinity** - System learns your search shortcuts (type "q" to find QuickLinks if that's how you found it before)
-- **Intent detection** - Auto-detects URLs, math expressions, currency, temperature, and commands
+- **Pattern-matched plugins** - Plugins can auto-trigger on patterns (e.g., math expressions, URLs) without explicit prefixes
 - **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort), includes desktop entry keywords (e.g., "whatsapp" finds ZapZap)
 - **Extensible plugins** - Language-agnostic handlers with simple JSON protocol (Python, Bash, Go, Rust, etc.)
 - **History tracking** - Search, plugin actions, and shell command history
@@ -61,22 +61,29 @@ Powered by [qalculate](https://qalculate.github.io/) - supports 150+ currencies 
 | Plugin | Trigger | Description |
 |--------|---------|-------------|
 | `apps` | `/apps` | App drawer with categories (like rofi/dmenu) |
-| `files` | `~` | File search with fd + fzf, thumbnails for images |
-| `clipboard` | `;` | Clipboard history with OCR search, filter by type |
-| `shell` | `!` | Shell command history (zsh/bash/fish) |
 | `bitwarden` | `/bitwarden` | Password manager with local caching |
-| `quicklinks` | `/quicklinks` | Web search with customizable quicklinks |
+| `calculate` | `=` or pattern | Calculator with currency, units, and temperature |
+| `clipboard` | `;` | Clipboard history with OCR search, filter by type |
+| `create-plugin` | `/create-plugin` | AI helper to create new plugins (requires [OpenCode](https://opencode.ai)) |
 | `dict` | `/dict` | Dictionary lookup with definitions |
+| `emoji` | `:` | Emoji picker with search |
+| `files` | `~` | File search with fd + fzf, thumbnails for images |
+| `flathub` | `/flathub` | Search and install apps from Flathub |
 | `notes` | `/notes` | Quick notes with multi-line content support |
 | `pictures` | `/pictures` | Browse images with thumbnails |
-| `screenshot` | `/screenshot` | Browse screenshots with OCR text search |
+| `quicklinks` | `/quicklinks` | Web search with customizable quicklinks |
 | `screenrecord` | `/screenrecord` | Screen recording with auto-trim (wf-recorder) |
+| `screenshot` | `/screenshot` | Browse screenshots with OCR text search |
+| `settings` | `/settings` | Configure Hamr launcher options |
+| `shell` | `!` | Shell command history (zsh/bash/fish) |
 | `snippet` | `/snippet` | Text snippets for quick insertion |
 | `todo` | `/todo` | Simple todo list manager |
-| `wallpaper` | `/wallpaper` | Wallpaper selector (illogical-impulse) |
-| `create-plugin` | `/create-plugin` | AI helper to create new plugins (requires [OpenCode](https://opencode.ai)) |
 | `topcpu` | `/topcpu` | Process monitor sorted by CPU usage (auto-refresh) |
 | `topmem` | `/topmem` | Process monitor sorted by memory usage (auto-refresh) |
+| `url` | pattern | Open URLs in browser (auto-detects domain patterns) |
+| `wallpaper` | `/wallpaper` | Wallpaper selector (illogical-impulse) |
+| `webapp` | `/webapp` | Install and manage web apps |
+| `whats-that-word` | `/whats-that-word` | Find words from descriptions or fix misspellings |
 
 ### Simple Actions (Scripts)
 
