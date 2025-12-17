@@ -708,6 +708,7 @@ Singleton {
         showFiles: false
         showHidden: false
         sortField: FolderListModel.Name
+        onCountChanged: root.loadPlugins()
         onStatusChanged: {
             if (status === FolderListModel.Ready) {
                 root.builtinFolderReady = true;
