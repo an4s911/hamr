@@ -165,6 +165,7 @@ Singleton {
                 property bool actionBarHidden: false
                 property real minXRatio: 0.5
                 property real minYRatio: 0.9
+                property bool minimized: false
             }
         }
     }

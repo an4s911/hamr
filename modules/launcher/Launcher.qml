@@ -411,7 +411,7 @@ Scope {
                 property bool isDragging: false
                 
                 x: isDragging ? x : Persistent.states.launcher.minXRatio * fabWindow.width - width / 2
-                y: isDragging ? y : Persistent.states.launcher.minYRatio * fabWindow.height
+                y: isDragging ? y : Persistent.states.launcher.minYRatio * fabWindow.height - Appearance.sizes.elevationMargin
                 
                 implicitWidth: fabContent.implicitWidth + Appearance.sizes.elevationMargin * 2
                 implicitHeight: fabContent.implicitHeight + Appearance.sizes.elevationMargin * 2
@@ -519,8 +519,9 @@ Scope {
                         onReleased: {
                             const screenW = fabWindow.width;
                             const screenH = fabWindow.height;
+                            const margin = Appearance.sizes.elevationMargin;
                             let xRatio = (fabContainer.x + fabContainer.width / 2) / screenW;
-                            let yRatio = fabContainer.y / screenH;
+                            let yRatio = (fabContainer.y + margin) / screenH;
                             
                             xRatio = Math.max(0.0, Math.min(1.0, xRatio));
                             yRatio = Math.max(0.0, Math.min(1.0, yRatio));
