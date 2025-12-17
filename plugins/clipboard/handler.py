@@ -310,6 +310,8 @@ def respond(results: list[dict], **kwargs):
         response["context"] = active_filter
     if kwargs.get("clear_input"):
         response["clearInput"] = True
+    if kwargs.get("navigate_forward") is False:
+        response["navigateForward"] = False
     print(json.dumps(response))
 
 
@@ -444,21 +446,23 @@ def main():
 
         # Plugin-level actions (from action bar)
         if item_id == "__plugin__":
-            # Filter by images - toggle
+            # Filter by images - toggle (view modification, not navigation)
             if action == "filter_images":
                 new_filter = "" if context == "images" else "images"
                 respond(
                     get_entry_results(entries, query, new_filter, ocr_texts),
                     active_filter=new_filter,
+                    navigate_forward=False,
                 )
                 return
 
-            # Filter by text - toggle
+            # Filter by text - toggle (view modification, not navigation)
             if action == "filter_text":
                 new_filter = "" if context == "text" else "text"
                 respond(
                     get_entry_results(entries, query, new_filter, ocr_texts),
                     active_filter=new_filter,
+                    navigate_forward=False,
                 )
                 return
 

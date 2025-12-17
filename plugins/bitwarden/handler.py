@@ -656,7 +656,7 @@ def main():
     if step == "action":
         item_id = selected.get("id", "")
 
-        # Plugin-level action: sync (from action bar)
+        # Plugin-level action: sync (from action bar) - view refresh, not navigation
         if item_id == "__plugin__" and action == "sync":
             run_bw(["sync"], session=session)
             clear_items_cache()
@@ -672,6 +672,7 @@ def main():
                         "placeholder": "Vault synced!",
                         "clearInput": True,
                         "pluginActions": get_plugin_actions(cache_age),
+                        "navigateForward": False,
                     }
                 )
             )
@@ -693,6 +694,7 @@ def main():
                         "placeholder": "Vault synced!",
                         "clearInput": True,
                         "pluginActions": get_plugin_actions(cache_age),
+                        "navigateForward": False,
                     }
                 )
             )
