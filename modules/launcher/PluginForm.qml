@@ -559,7 +559,8 @@ Rectangle {
             property var options: fieldData.options ?? []
             property string value: {
                 if (selectCombo.currentIndex >= 0 && selectCombo.currentIndex < options.length) {
-                    return options[selectCombo.currentIndex].id ?? options[selectCombo.currentIndex].name ?? "";
+                    const o = options[selectCombo.currentIndex];
+                    return o.value ?? o.id ?? o.name ?? "";
                 }
                 return "";
             }
@@ -568,11 +569,19 @@ Rectangle {
                 selectCombo.forceActiveFocus();
             }
             
+            function getOptionValue(o) {
+                return o.value ?? o.id ?? o.name ?? "";
+            }
+            
+            function getOptionLabel(o) {
+                return o.label ?? o.name ?? o.id ?? o.value ?? "";
+            }
+            
             // Get initial index from stored value or default
             function getInitialIndex() {
                 let storedVal = root.getFieldValue(fieldData.id, fieldData.default ?? "");
                 if (!storedVal) return 0;
-                let idx = options.findIndex(o => (o.id ?? o.name) === storedVal);
+                let idx = options.findIndex(o => getOptionValue(o) === storedVal);
                 return idx >= 0 ? idx : 0;
             }
             
@@ -590,14 +599,14 @@ Rectangle {
                 id: selectCombo
                 Layout.fillWidth: true
                 
-                model: selectFieldRoot.options.map(o => o.name ?? o.id ?? "")
+                model: selectFieldRoot.options.map(o => selectFieldRoot.getOptionLabel(o))
                 
                 currentIndex: selectFieldRoot.getInitialIndex()
                 
                 // Persist value on change
                 onCurrentIndexChanged: {
                     if (currentIndex >= 0 && currentIndex < selectFieldRoot.options.length) {
-                        let val = selectFieldRoot.options[currentIndex].id ?? selectFieldRoot.options[currentIndex].name ?? "";
+                        let val = selectFieldRoot.getOptionValue(selectFieldRoot.options[currentIndex]);
                         root.updateFieldValue(fieldData.id, val);
                     }
                 }
@@ -627,6 +636,41 @@ Rectangle {
                     text: "expand_more"
                     iconSize: Appearance.font.pixelSize.normal
                     color: Appearance.m3colors.m3onSurface
+                }
+                
+                delegate: ItemDelegate {
+                    width: selectCombo.width
+                    contentItem: Text {
+                        text: modelData
+                        color: Appearance.m3colors.m3onSurface
+                        font: selectCombo.font
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: highlighted ? Appearance.colors.colSurfaceContainerHighest : "transparent"
+                    }
+                    highlighted: selectCombo.highlightedIndex === index
+                }
+                
+                popup: Popup {
+                    y: selectCombo.height
+                    width: selectCombo.width
+                    implicitHeight: contentItem.implicitHeight + 2
+                    padding: 1
+                    
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: selectCombo.popup.visible ? selectCombo.delegateModel : null
+                        currentIndex: selectCombo.highlightedIndex
+                    }
+                    
+                    background: Rectangle {
+                        color: Appearance.m3colors.m3surfaceContainerHigh
+                        border.color: Appearance.colors.colOutlineVariant
+                        border.width: 1
+                        radius: Appearance.rounding.small
+                    }
                 }
                 
                 Keys.onPressed: event => {
