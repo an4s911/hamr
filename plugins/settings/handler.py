@@ -186,6 +186,12 @@ SETTINGS_SCHEMA: dict[str, dict[str, dict]] = {
             "type": "number",
             "description": "Time (ms) to preserve state after soft close",
         },
+        "clickOutsideAction": {
+            "default": "intuitive",
+            "type": "select",
+            "options": ["intuitive", "close", "minimize"],
+            "description": "Action when clicking outside (intuitive/close/minimize)",
+        },
     },
     "appearance": {
         "backgroundTransparency": {
@@ -517,6 +523,18 @@ def show_edit_form(category: str, key: str, info: dict, current_value):
                 ],
                 "default": "true" if current_value else "false",
                 "hint": f"{description}\nDefault: {'Yes' if default else 'No'}",
+            }
+        ]
+    elif setting_type == "select":
+        options = info.get("options", [])
+        fields = [
+            {
+                "id": "value",
+                "type": "select",
+                "label": key,
+                "options": [{"value": opt, "label": opt} for opt in options],
+                "default": str(current_value) if current_value else str(default),
+                "hint": f"{description}\nDefault: {default}",
             }
         ]
     elif setting_type == "list":

@@ -133,6 +133,11 @@ Singleton {
                 // Reopening within this window restores previous view
                 // Set to 0 to disable (always start fresh)
                 property int stateRestoreWindowMs: 30000  // 30 seconds
+                // What happens when clicking outside the launcher:
+                // "intuitive" - minimize if previously minimized, otherwise close
+                // "close" - always close
+                // "minimize" - always minimize to FAB
+                property string clickOutsideAction: "intuitive"
             }
 
             // ==================== APPEARANCE ====================

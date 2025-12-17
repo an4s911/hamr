@@ -17,6 +17,19 @@ Scope {
     
     // Track if state is pending cleanup (soft close occurred, waiting for timeout or reopen)
     property bool statePendingCleanup: false
+    
+    // Track if user has minimized at least once (for intuitive click-outside behavior)
+    // Initialized from persistent state, set to true when user minimizes
+    property bool hasMinimizedThisSession: Persistent.states.launcher.minimized
+    
+    Connections {
+        target: GlobalStates
+        function onLauncherMinimizedChanged() {
+            if (GlobalStates.launcherMinimized) {
+                launcherScope.hasMinimizedThisSession = true;
+            }
+        }
+    }
 
     // Write launch timestamp for plugins that need to know when hamr was opened
     // (e.g., screenrecord plugin uses this to trim the end of recordings)
@@ -234,8 +247,16 @@ Scope {
 
                         if (mouse.x < contentMapped.x || mouse.x > contentMapped.x + content.width ||
                             mouse.y < contentMapped.y || mouse.y > contentMapped.y + content.height) {
-                            GlobalStates.softClose = true;
-                            GlobalStates.launcherOpen = false;
+                            const action = Config.options.behavior?.clickOutsideAction ?? "intuitive";
+                            const shouldMinimize = action === "minimize" || 
+                                (action === "intuitive" && launcherScope.hasMinimizedThisSession);
+                            
+                            if (shouldMinimize) {
+                                GlobalStates.launcherMinimized = true;
+                            } else {
+                                GlobalStates.softClose = true;
+                                GlobalStates.launcherOpen = false;
+                            }
                         }
                     }
                 }
