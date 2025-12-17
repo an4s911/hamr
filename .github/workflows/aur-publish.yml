@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install SSH key
         env:
@@ -103,10 +105,14 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: |
-          # Get commits since last tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Get current tag from ref
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          
+          # Get previous tag (excluding current)
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${CURRENT_TAG}$" | head -1)
+          
           if [ -n "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"%s" $PREV_TAG..HEAD --no-merges)
+            COMMITS=$(git log --pretty=format:"%s" ${PREV_TAG}..${CURRENT_TAG} --no-merges)
           else
             COMMITS=$(git log --pretty=format:"%s" --no-merges -20)
           fi
