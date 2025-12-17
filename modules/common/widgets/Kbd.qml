@@ -19,6 +19,7 @@ Rectangle {
     
     property var keys: ""
     property color textColor: Appearance.m3colors.m3onSurfaceVariant
+    property bool lightBackground: false
     
     readonly property string displayText: {
         if (Array.isArray(keys)) {
@@ -31,9 +32,9 @@ Rectangle {
     implicitHeight: keyText.implicitHeight + 4
     
     radius: 4
-    color: Appearance.colors.colSurfaceContainerHighest
+    color: lightBackground ? "#B0B0B0" : Appearance.colors.colSurfaceContainerHighest
     border.width: 1
-    border.color: Appearance.colors.colOutline
+    border.color: lightBackground ? "#707070" : Appearance.colors.colOutline
     
     Text {
         id: keyText
