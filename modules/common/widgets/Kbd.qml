@@ -33,7 +33,7 @@ Rectangle {
     radius: 4
     color: Appearance.colors.colSurfaceContainerHighest
     border.width: 1
-    border.color: Appearance.colors.colOutlineVariant
+    border.color: Appearance.colors.colOutline
     
     Text {
         id: keyText

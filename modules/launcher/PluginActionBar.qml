@@ -6,7 +6,10 @@
  * than to specific items in the result list.
  * 
  * Features:
- * - Up to 6 action buttons with icons and labels
+ * - Home button (double Esc) - returns to main view
+ * - Back button (single Esc) - goes back one navigation level
+ * - Up to 6 action buttons with icons and keyboard shortcuts
+ * - Tooltips show action names on hover
  * - Keyboard shortcuts (Ctrl+1 through Ctrl+6)
  * - Confirmation dialog for dangerous actions (when action has `confirm` field)
  */
@@ -34,8 +37,11 @@ Item {
     // Currently showing confirmation for this action
     property var pendingConfirmAction: null
     
-    // Signal when back button is clicked
+    // Signal when back button is clicked (go back one level)
     signal backClicked()
+    
+    // Signal when home button is clicked (go back to main view)
+    signal homeClicked()
     
     // Action buttons row
     RowLayout {
@@ -44,11 +50,69 @@ Item {
         spacing: 8
         visible: root.pendingConfirmAction === null
         
-        // Back button (always shown)
+        // Home button - goes back to main view
+        RippleButton {
+            id: homeBtn
+            Layout.fillHeight: true
+            implicitWidth: homeContent.implicitWidth + 16
+            
+            buttonRadius: 4
+            colBackground: "transparent"
+            colBackgroundHover: Appearance.colors.colSurfaceContainerHighest
+            colRipple: Appearance.colors.colSurfaceContainerHighest
+            
+            onClicked: root.homeClicked()
+            
+            StyledToolTip {
+                text: "Home"
+            }
+            
+            Rectangle {
+                anchors.fill: parent
+                radius: 4
+                color: "transparent"
+                border.width: 1
+                border.color: Appearance.colors.colOutlineVariant
+            }
+            
+            contentItem: RowLayout {
+                id: homeContent
+                spacing: 8
+                
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "home"
+                    iconSize: 18
+                    color: Appearance.m3colors.m3onSurfaceVariant
+                }
+                
+                Item {
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: stackedKbd.width + 3
+                    implicitHeight: stackedKbd.height + 3
+                    
+                    Kbd {
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        keys: "Esc"
+                        opacity: 0.5
+                    }
+                    
+                    Kbd {
+                        id: stackedKbd
+                        keys: "Esc"
+                    }
+                }
+            }
+        }
+        
+        // Back button - goes back one level
         RippleButton {
             id: backBtn
             Layout.fillHeight: true
             implicitWidth: backContent.implicitWidth + 16
+            enabled: root.navigationDepth > 0
+            opacity: root.navigationDepth > 0 ? 1.0 : 0.4
             
             buttonRadius: 4
             colBackground: "transparent"
@@ -57,7 +121,11 @@ Item {
             
             onClicked: root.backClicked()
             
-            // Border outline
+            StyledToolTip {
+                text: "Back"
+                extraVisibleCondition: backBtn.enabled
+            }
+            
             Rectangle {
                 anchors.fill: parent
                 radius: 4
@@ -74,13 +142,6 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
                     text: "arrow_back"
                     iconSize: 18
-                    color: Appearance.m3colors.m3onSurfaceVariant
-                }
-                
-                Text {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "Back"
-                    font.pixelSize: Appearance.font.pixelSize.smaller
                     color: Appearance.m3colors.m3onSurfaceVariant
                 }
                 
@@ -129,7 +190,7 @@ Item {
         }
         
         Repeater {
-            model: root.actions.slice(0, 5)  // Reduced to 5 since back button takes one slot
+            model: root.actions.slice(0, 6)
             
             delegate: RippleButton {
                 id: actionBtn
@@ -159,7 +220,10 @@ Item {
                     }
                 }
                 
-                // Border outline
+                StyledToolTip {
+                    text: actionBtn.actionName
+                }
+                
                 Rectangle {
                     anchors.fill: parent
                     radius: 4
@@ -176,13 +240,6 @@ Item {
                         Layout.alignment: Qt.AlignVCenter
                         text: actionBtn.actionIcon
                         iconSize: 18
-                        color: Appearance.m3colors.m3onSurfaceVariant
-                    }
-                    
-                    Text {
-                        Layout.alignment: Qt.AlignVCenter
-                        text: actionBtn.actionName
-                        font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.m3colors.m3onSurfaceVariant
                     }
                     

@@ -506,6 +506,10 @@ Item {
                         root.focusSearchInput();
                         return;
                     }
+                    PluginRunner.goBack();
+                }
+                
+                onHomeClicked: {
                     LauncherSearch.exitPlugin();
                 }
             }

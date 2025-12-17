@@ -998,13 +998,12 @@ Singleton {
      
      // Go back one step in plugin navigation
      // If we're at the initial view (depth 0), close the plugin entirely
-     // Otherwise, send __back__ action to the handler
+     // Go back one level within the plugin (does nothing at depth 0)
      function goBack() {
          if (!root.activePlugin) return;
          
-         // If at initial view, close the plugin
+         // At initial view, do nothing - use closePlugin() to exit
          if (root.navigationDepth <= 0) {
-             root.closePlugin();
              return;
          }
          

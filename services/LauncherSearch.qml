@@ -567,23 +567,25 @@ Singleton {
     
     function exitPlugin() {
         if (!PluginRunner.isActive()) return;
+        PluginRunner.closePlugin();
+        root.query = "";
+    }
+    
+    function handlePluginEscape() {
+        if (!PluginRunner.isActive()) return false;
         
-         const now = Date.now();
-         const timeSinceLastEscape = now - root.lastEscapeTime;
-         root.lastEscapeTime = now;
-         
-         if (timeSinceLastEscape < root.doubleEscapeThreshold && PluginRunner.navigationDepth > 0) {
-             PluginRunner.closePlugin();
-             root.query = "";
-             return;
-         }
-         
-         const wasAtInitial = PluginRunner.navigationDepth <= 0;
-         PluginRunner.goBack();
-         if (wasAtInitial) {
-             root.query = "";
-         }
-     }
+        const now = Date.now();
+        const timeSinceLastEscape = now - root.lastEscapeTime;
+        root.lastEscapeTime = now;
+        
+        if (timeSinceLastEscape < root.doubleEscapeThreshold) {
+            root.exitPlugin();
+        } else if (PluginRunner.navigationDepth > 0) {
+            PluginRunner.goBack();
+        }
+        // At depth 0 with single Esc: do nothing, just record the time for double-tap detection
+        return true;
+    }
      
     Timer {
          id: pluginSearchTimer

@@ -310,7 +310,7 @@ Scope {
                     if (event.key === Qt.Key_Escape) {
                         // Priority: plugin > exclusive mode > close launcher
                         if (PluginRunner.isActive()) {
-                            LauncherSearch.exitPlugin();
+                            LauncherSearch.handlePluginEscape();
                         } else if (LauncherSearch.isInExclusiveMode()) {
                             LauncherSearch.exitExclusiveMode();
                         } else {
