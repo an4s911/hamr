@@ -339,6 +339,17 @@ RippleButton {
                     horizontalAlignment: Text.AlignLeft
                     elide: Text.ElideRight
                     text: root.displayContent
+
+                    HoverHandler {
+                        id: nameHover
+                    }
+
+                    StyledToolTipContent {
+                        text: root.itemName
+                        shown: nameHover.hovered && nameText.truncated
+                        anchors.bottom: nameText.top
+                        anchors.left: nameText.left
+                    }
                 }
             }
              StyledText {
