@@ -27,17 +27,13 @@ Singleton {
     // Hamr config folder: ~/.config/hamr/
     property string hamrConfig: FileUtils.trimFileProtocol(`${Directories.config}/hamr`)
     
-    // External theme integration (e.g., end-4's illogical-impulse generates colors here)
-    property string externalThemeState: FileUtils.trimFileProtocol(`${Directories.state}/user`)
-    // Colors JSON path: user-configurable or default to illogical-impulse location
+    // Colors JSON path: user-configurable or default to ~/.config/hamr/colors.json
     property string generatedMaterialThemePath: {
         const customPath = Config.options.paths?.colorsJson ?? "";
         if (customPath && customPath.length > 0) {
-            // User specified custom path
             return FileUtils.trimFileProtocol(customPath.replace("~", FileUtils.trimFileProtocol(Directories.home)));
         }
-        // Default: illogical-impulse generated colors
-        return FileUtils.trimFileProtocol(`${Directories.externalThemeState}/generated/colors.json`);
+        return FileUtils.trimFileProtocol(`${Directories.hamrConfig}/colors.json`);
     }
     
     // Hamr data paths

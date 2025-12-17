@@ -62,7 +62,7 @@ package() {
 
     # Install to /etc/xdg/quickshell/hamr (system-wide quickshell config)
     install -dm755 "$pkgdir/etc/xdg/quickshell/$pkgname"
-    cp -r modules services plugins scripts assets "$pkgdir/etc/xdg/quickshell/$pkgname/"
+    cp -r modules services plugins scripts assets defaults "$pkgdir/etc/xdg/quickshell/$pkgname/"
     cp *.qml "$pkgdir/etc/xdg/quickshell/$pkgname/"
 
     # Install hamr command
