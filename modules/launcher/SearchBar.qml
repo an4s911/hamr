@@ -295,6 +295,7 @@ RowLayout {
         implicitWidth: root.showMinimizeButton ? 24 : 0
         implicitHeight: 24
         clip: true
+        property bool hovered: minimizeArea.containsMouse
         
         Behavior on implicitWidth {
             NumberAnimation { duration: 150; easing.type: Easing.OutCubic }

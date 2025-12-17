@@ -122,10 +122,10 @@ Scope {
             WlrLayershell.namespace: "quickshell:hamr"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+            exclusionMode: ExclusionMode.Ignore
             color: "transparent"
 
             mask: Region {
-                // Accept input on the full screen background for click-outside-to-close
                 item: GlobalStates.launcherOpen ? fullScreenBackground : null
             }
 
@@ -225,17 +225,15 @@ Scope {
                 id: fullScreenBackground
                 anchors.fill: parent
 
-                // Background MouseArea to close when clicking outside search widget
                 MouseArea {
                     anchors.fill: parent
                     visible: GlobalStates.launcherOpen
                     onClicked: (mouse) => {
-                        // Check if click is outside the search widget bounds
-                        const widgetMapped = columnLayout.mapToItem(fullScreenBackground, 0, 0);
+                        const content = searchWidget.contentItem;
+                        const contentMapped = content.mapToItem(fullScreenBackground, 0, 0);
 
-                        if (mouse.x < widgetMapped.x || mouse.x > widgetMapped.x + columnLayout.width ||
-                            mouse.y < widgetMapped.y || mouse.y > widgetMapped.y + columnLayout.height) {
-                            // Click is outside - soft close (preserves state for restore window)
+                        if (mouse.x < contentMapped.x || mouse.x > contentMapped.x + content.width ||
+                            mouse.y < contentMapped.y || mouse.y > contentMapped.y + content.height) {
                             GlobalStates.softClose = true;
                             GlobalStates.launcherOpen = false;
                         }
