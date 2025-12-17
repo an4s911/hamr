@@ -117,8 +117,8 @@ jobs:
             COMMITS=$(git log --pretty=format:"%s" --no-merges -20)
           fi
           
-          # Detect new plugins added (commits with "add ... plugin" pattern)
-          NEW_PLUGINS=$(echo "$COMMITS" | grep -iE "add.+plugin" | sed 's/.*add \(.*\) plugin.*/\1/' | sed 's/^/- /' || true)
+          # Detect new plugins added (commits like "feat(plugins): add X plugin")
+          NEW_PLUGINS=$(echo "$COMMITS" | grep -E "^feat\(plugins\): add [a-z-]+ plugin" | sed 's/.*add \([a-z-]*\) plugin.*/\1/' | sed 's/^/- /' || true)
           
           # Sort by conventional commit type (exclude plugin additions from features)
           FEAT=$(echo "$COMMITS" | grep -E "^feat(\(.+\))?:" | grep -viE "add.+plugin" | sed 's/^/- /' || true)
