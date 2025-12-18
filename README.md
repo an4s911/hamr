@@ -16,6 +16,18 @@ Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quic
 
 ![Hamr Demo](assets/recording/hamr-demo.gif)
 
+## Philosophy
+
+**Minimalist UI** - Clean, modern, no visual clutter. Just a search bar and results. No sidebars, tabs, or menus unless absolutely necessary.
+
+**Zero Configuration** - Works out of the box with sensible defaults. Settings exist but you should never need to touch them.
+
+**Minimum Interactions** - Every feature optimized for fewest possible keystrokes. Search, Enter, done.
+
+**Learns Your Habits** - Frecency ranking means frequently-used items rise to the top automatically. Type "ff" once to launch Firefox, and "ff" becomes your shortcut forever.
+
+**Keyboard-First** - Full functionality without touching the mouse. Vim-style navigation (Ctrl+J/K), quick action shortcuts (Ctrl+1-6), and muscle-memory-friendly bindings.
+
 ## Features
 
 - **Frecency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))

@@ -6,6 +6,9 @@ __pycache__/
 .qmlls.ini
 CODE_COMPLEXITY.md
 
+# Future project spec (not part of current hamr)
+RUSTY_HAMR.md
+
 # AUR package repo (separate git repo)
 aur/
 
