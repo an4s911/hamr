@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import qs.modules.common
 import qs.modules.common.functions
+import qs.services
 
 /**
  * PluginRunner - Multi-step action plugin execution service
@@ -104,27 +105,6 @@ Singleton {
     // Queue of plugins pending indexing (since we can only run one at a time)
     property var indexQueue: []
     
-    // Reindex timers per plugin (created dynamically based on manifest)
-    property var reindexTimers: ({})
-    
-    // Parse reindex interval from manifest string (e.g., "30s", "5m", "1h", "never")
-    function parseReindexInterval(intervalStr) {
-        if (!intervalStr || intervalStr === "never") return 0;
-        
-        const match = intervalStr.match(/^(\d+)(s|m|h)$/);
-        if (!match) return 0;
-        
-        const value = parseInt(match[1], 10);
-        const unit = match[2];
-        
-        switch (unit) {
-            case "s": return value * 1000;
-            case "m": return value * 60 * 1000;
-            case "h": return value * 60 * 60 * 1000;
-            default: return 0;
-        }
-    }
-    
     // Request index from a plugin
     // mode: "full" (replace all items) or "incremental" (merge/remove)
     function indexPlugin(pluginId, mode = "full") {
@@ -216,8 +196,7 @@ Singleton {
                 const reason = hasWatchers ? "has watchers" : "reindex: never";
                 console.log(`[PluginRunner] Skipping ${plugin.id}: using cached ${root.pluginIndexes[plugin.id].items.length} items (${reason})`);
                 // Still setup watchers for this plugin
-                setupFileWatchers(plugin.id);
-                setupDirWatchers(plugin.id);
+                PluginWatcher.setupWatchers(plugin.id, plugin.manifest);
                 continue;
             }
             
@@ -281,221 +260,19 @@ Singleton {
         // Save cache to disk (debounced)
         root.saveIndexCache();
         
-        // Setup reindex timer if configured (fallback for plugins without watchers)
-        setupReindexTimer(pluginId);
-        
-        // Setup file watchers if configured (preferred over polling)
-        setupFileWatchers(pluginId);
-        
-        // Setup directory watchers if configured
-        setupDirWatchers(pluginId);
-    }
-    
-    // Setup reindex timer for a plugin based on manifest config
-    function setupReindexTimer(pluginId) {
+        // Setup watchers (file, dir, Hyprland events, periodic reindex)
         const plugin = root.plugins.find(p => p.id === pluginId);
-        if (!plugin?.manifest?.index) return;
-        
-        const intervalMs = parseReindexInterval(plugin.manifest.index.reindex);
-        if (intervalMs <= 0) return;
-        
-        // Destroy existing timer if any
-        if (root.reindexTimers[pluginId]) {
-            root.reindexTimers[pluginId].destroy();
+        if (plugin?.manifest) {
+            PluginWatcher.setupWatchers(pluginId, plugin.manifest);
         }
-        
-        // Create new timer
-        const timer = Qt.createQmlObject(
-            `import QtQuick; Timer { 
-                interval: ${intervalMs}; 
-                repeat: true; 
-                running: true;
-                property string targetPluginId: "${pluginId}"
-            }`,
-            root,
-            "reindexTimer_" + pluginId
-        );
-        
-        timer.triggered.connect(() => {
-            root.indexPlugin(pluginId, "incremental");
-        });
-        
-        root.reindexTimers[pluginId] = timer;
     }
     
-    // ==================== FILE/DIR WATCHERS ====================
-    // Plugins can define watchFiles or watchDirs in manifest to trigger reindex on change.
-    // More efficient than polling - only reindex when data actually changes.
-    //
-    // Manifest format:
-    //   "index": {
-    //     "enabled": true,
-    //     "watchFiles": ["~/.config/hamr/quicklinks.json"],
-    //     "watchDirs": ["/usr/share/applications", "~/.local/share/applications"]
-    //   }
-    // ===========================================================
-    
-    // File watchers per plugin: { pluginId: [FileView, ...] }
-    property var fileWatchers: ({})
-    
-    // Directory watchers per plugin: { pluginId: [FolderListModel, ...] }
-    property var dirWatchers: ({})
-    
-    // Debounce timers for file change events (avoid multiple reindexes)
-    property var fileWatcherDebounce: ({})
-    
-    // Expand ~ to home directory
-    function expandPath(path) {
-        if (path.startsWith("~/")) {
-            return Directories.home + path.substring(1);
+    // Connect to PluginWatcher reindex requests
+    Connections {
+        target: PluginWatcher
+        function onReindexRequested(pluginId, mode) {
+            root.indexPlugin(pluginId, mode);
         }
-        return path;
-    }
-    
-    // Setup file watchers for a plugin based on manifest config
-    function setupFileWatchers(pluginId) {
-        const plugin = root.plugins.find(p => p.id === pluginId);
-        if (!plugin?.manifest?.index?.watchFiles) return;
-        
-        const watchFiles = plugin.manifest.index.watchFiles;
-        if (!Array.isArray(watchFiles) || watchFiles.length === 0) return;
-        
-        // Skip if watchers already exist (avoid re-creating on reindex)
-        if (root.fileWatchers[pluginId]?.length > 0) return;
-        
-        const watchers = [];
-        
-        for (const filePath of watchFiles) {
-            const expandedPath = root.expandPath(filePath);
-            
-            // Create FileView watcher using Qt.createQmlObject
-            // watchChanges: true is required for onFileChanged to fire
-            const watcher = Qt.createQmlObject(
-                `import Quickshell.Io;
-                FileView {
-                    property string targetPluginId: "${pluginId}"
-                    path: "${expandedPath}"
-                    watchChanges: true
-                    onFileChanged: {
-                        root.onWatchedFileChanged(targetPluginId);
-                    }
-                }`,
-                root,
-                "fileWatcher_" + pluginId + "_" + filePath
-            );
-            
-            watchers.push(watcher);
-        }
-        
-        root.fileWatchers[pluginId] = watchers;
-        console.log(`[PluginRunner] Setup ${watchers.length} file watcher(s) for ${pluginId}: ${watchFiles.join(", ")}`);
-    }
-    
-    // Setup directory watchers for a plugin based on manifest config
-    function setupDirWatchers(pluginId) {
-        const plugin = root.plugins.find(p => p.id === pluginId);
-        if (!plugin?.manifest?.index?.watchDirs) return;
-        
-        const watchDirs = plugin.manifest.index.watchDirs;
-        if (!Array.isArray(watchDirs) || watchDirs.length === 0) return;
-        
-        // Skip if watchers already exist (avoid re-creating on reindex)
-        if (root.dirWatchers[pluginId]?.length > 0) return;
-        
-        const watchers = [];
-        
-        for (const dirPath of watchDirs) {
-            const expandedPath = root.expandPath(dirPath);
-            
-            // Create FolderListModel watcher using Qt.createQmlObject
-            // onCountChanged fires when files are added/removed
-            const watcher = Qt.createQmlObject(
-                `import Qt.labs.folderlistmodel;
-                FolderListModel {
-                    property string targetPluginId: "${pluginId}"
-                    folder: "file://${expandedPath}"
-                    showFiles: true
-                    showDirs: false
-                    onCountChanged: {
-                        if (status === FolderListModel.Ready) {
-                            root.onWatchedDirChanged(targetPluginId);
-                        }
-                    }
-                }`,
-                root,
-                "dirWatcher_" + pluginId + "_" + dirPath
-            );
-            
-            watchers.push(watcher);
-        }
-        
-        root.dirWatchers[pluginId] = watchers;
-        console.log(`[PluginRunner] Setup ${watchers.length} dir watcher(s) for ${pluginId}: ${watchDirs.join(", ")}`);
-    }
-    
-    // Called when a watched directory changes - debounced reindex
-    function onWatchedDirChanged(pluginId) {
-        console.log(`[PluginRunner] Dir change detected for ${pluginId}`);
-        
-        // Use same debounce mechanism as file watchers
-        if (root.fileWatcherDebounce[pluginId]) {
-            root.fileWatcherDebounce[pluginId].restart();
-            return;
-        }
-        
-        const timer = Qt.createQmlObject(
-            `import QtQuick; Timer {
-                interval: 1000;
-                repeat: false;
-                running: true;
-                property string targetPluginId: "${pluginId}"
-            }`,
-            root,
-            "dirWatcherDebounce_" + pluginId
-        );
-        
-        timer.triggered.connect(() => {
-            console.log(`[PluginRunner] Dir changed for ${pluginId}, triggering reindex`);
-            root.indexPlugin(pluginId, "incremental");
-            timer.destroy();
-            delete root.fileWatcherDebounce[pluginId];
-        });
-        
-        root.fileWatcherDebounce[pluginId] = timer;
-    }
-    
-    // Called when a watched file changes - debounced reindex
-    function onWatchedFileChanged(pluginId) {
-        console.log(`[PluginRunner] File change detected for ${pluginId}`);
-        
-        // Debounce: wait 500ms after last change before reindexing
-        // This handles rapid file changes (e.g., multiple writes)
-        if (root.fileWatcherDebounce[pluginId]) {
-            root.fileWatcherDebounce[pluginId].restart();
-            return;
-        }
-        
-        // Create debounce timer
-        const timer = Qt.createQmlObject(
-            `import QtQuick; Timer {
-                interval: 500;
-                repeat: false;
-                running: true;
-                property string targetPluginId: "${pluginId}"
-            }`,
-            root,
-            "fileWatcherDebounce_" + pluginId
-        );
-        
-        timer.triggered.connect(() => {
-            console.log(`[PluginRunner] File changed for ${pluginId}, triggering reindex`);
-            root.indexPlugin(pluginId, "incremental");
-            // Clean up timer after use
-            timer.destroy();
-            delete root.fileWatcherDebounce[pluginId];
-        });
-        
-        root.fileWatcherDebounce[pluginId] = timer;
     }
     
     // Get all indexed items across all plugins (for LauncherSearch)
