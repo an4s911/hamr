@@ -50,24 +50,9 @@ Hamr is an extensible launcher for Hyprland built with [Quickshell](https://quic
 
 ### Smart Calculator
 
-Type math expressions directly - no prefix needed:
+Type math expressions directly - no prefix needed. Examples: `2+2`, `sqrt(16)`, `10c` (celsius), `$50 to EUR`, `20% of 32`, `10ft to m`
 
-| Input | Output | Description |
-|-------|--------|-------------|
-| `2+2` | `4` | Basic math |
-| `sqrt(16)` | `4` | Math functions |
-| `10c` | `50 °F` | Temperature (Celsius to Fahrenheit) |
-| `34f` | `1.11 °C` | Temperature (Fahrenheit to Celsius) |
-| `$50` | `50 USD` | Currency symbol conversion |
-| `S$100 to USD` | `$76.77` | Prefixed currency (SGD) |
-| `sgd100` | `100 SGD` | Currency code (no space) |
-| `VND 1,000,000` | `$38.06` | Thousand separators |
-| `20% of 32` | `6.4` | Percentage calculations |
-| `15% off 100` | `85` | Discount calculations |
-| `10ft to m` | `3.048 m` | Unit conversion |
-| `100 USD in EUR` | `€86.42` | Currency conversion |
-
-Powered by [qalculate](https://qalculate.github.io/) - supports 150+ currencies with daily exchange rates (ECB), 100+ units, and advanced math. Run `qalc -e` to update rates.
+Powered by [qalculate](https://qalculate.github.io/) - supports 150+ currencies, 100+ units, percentages, and advanced math.
 
 ### Built-in Plugins
 
@@ -675,89 +660,10 @@ When you open Hamr with an empty search, you may see suggested apps at the top m
 
 ## Configuration
 
-Hamr is configured via `~/.config/hamr/config.json`. The install script creates a default config that you can customize. When updating, new config options are merged without overwriting your existing values.
+Hamr is configured via `~/.config/hamr/config.json`. Use the built-in settings plugin (`/settings`) to browse and modify options - no manual editing needed.
 
 <details>
-<summary><strong>Full Configuration Reference</strong></summary>
-
-```json
-{
-  "apps": {
-    "terminal": "ghostty",
-    "terminalArgs": "--class=floating.terminal",
-    "shell": "zsh"
-  },
-  "behavior": {
-    "stateRestoreWindowMs": 30000,
-    "clickOutsideAction": "intuitive"
-  },
-  "search": {
-    "nonAppResultDelay": 30,
-    "debounceMs": 50,
-    "pluginDebounceMs": 150,
-    "maxHistoryItems": 500,
-    "maxDisplayedResults": 16,
-    "maxRecentItems": 20,
-    "shellHistoryLimit": 50,
-    "engineBaseUrl": "https://www.google.com/search?q=",
-    "excludedSites": ["quora.com", "facebook.com"],
-    "prefix": {
-      "action": "/",
-      "app": ">",
-      "clipboard": ";",
-      "emojis": ":",
-      "file": "~",
-      "math": "=",
-      "shellCommand": "$",
-      "shellHistory": "!",
-      "webSearch": "?"
-    },
-    "shellHistory": {
-      "enable": true,
-      "shell": "auto",
-      "customHistoryPath": "",
-      "maxEntries": 500
-    },
-    "actionKeys": ["u", "i", "o", "p"]
-  },
-  "imageBrowser": {
-    "useSystemFileDialog": false,
-    "columns": 4,
-    "cellAspectRatio": 1.333,
-    "sidebarWidth": 140
-  },
-  "appearance": {
-    "backgroundTransparency": 0.2,
-    "contentTransparency": 0.2,
-    "launcherXRatio": 0.5,
-    "launcherYRatio": 0.1
-  },
-  "sizes": {
-    "searchWidth": 580,
-    "searchInputHeight": 40,
-    "maxResultsHeight": 600,
-    "resultIconSize": 40,
-    "imageBrowserWidth": 1200,
-    "imageBrowserHeight": 690,
-    "windowPickerMaxWidth": 350,
-    "windowPickerMaxHeight": 220
-  },
-  "fonts": {
-    "main": "Google Sans Flex",
-    "monospace": "JetBrains Mono NF",
-    "reading": "Readex Pro",
-    "icon": "Material Symbols Rounded"
-  },
-  "paths": {
-    "wallpaperDir": "",
-    "colorsJson": ""
-  }
-}
-```
-
-</details>
-
-### Configuration Options
+<summary><strong>Configuration Reference</strong></summary>
 
 | Category | Option | Default | Description |
 |----------|--------|---------|-------------|
@@ -765,38 +671,19 @@ Hamr is configured via `~/.config/hamr/config.json`. The install script creates 
 | | `terminalArgs` | `--class=floating.terminal` | Arguments passed to terminal |
 | | `shell` | `zsh` | Shell for command execution (zsh, bash, fish) |
 | **Behavior** | `stateRestoreWindowMs` | `30000` | Time (ms) to preserve state after soft close (0 to disable) |
-| | `clickOutsideAction` | `intuitive` | Click outside behavior: `intuitive` (minimize if used before, else close), `close`, or `minimize` |
+| | `clickOutsideAction` | `intuitive` | Click outside behavior: `intuitive`, `close`, or `minimize` |
 | **Search** | `maxDisplayedResults` | `16` | Maximum results shown in launcher |
 | | `maxRecentItems` | `20` | Recent history items on empty search |
-| | `shellHistoryLimit` | `50` | Shell history results limit |
 | | `debounceMs` | `50` | Search input debounce (ms) |
-| | `pluginDebounceMs` | `150` | Plugin search debounce (ms) |
 | **Appearance** | `backgroundTransparency` | `0.2` | Background transparency (0-1) |
-| | `contentTransparency` | `0.2` | Content area transparency (0-1) |
 | | `launcherXRatio` | `0.5` | Horizontal position (0=left, 1=right) |
 | | `launcherYRatio` | `0.1` | Vertical position (0=top, 1=bottom) |
 | **Sizes** | `searchWidth` | `580` | Search bar width (px) |
-| | `searchInputHeight` | `40` | Search input height (px) |
 | | `maxResultsHeight` | `600` | Max results container height (px) |
-| | `resultIconSize` | `40` | Icon size in results (px) |
-| | `imageBrowserWidth` | `1200` | Image browser width (px) |
-| | `imageBrowserHeight` | `690` | Image browser height (px) |
-| **Fonts** | `main` | `Google Sans Flex` | Main UI font |
-| | `monospace` | `JetBrains Mono NF` | Monospace font |
-| | `reading` | `Readex Pro` | Reading/content font |
-| | `icon` | `Material Symbols Rounded` | Icon font |
 | **Paths** | `wallpaperDir` | `""` | Custom wallpaper directory (empty = ~/Pictures/Wallpapers) |
 | | `colorsJson` | `""` | Custom colors.json path (empty = illogical-impulse default) |
 
-### Changing Settings
-
-Use the built-in settings plugin to browse and modify configuration options:
-
-1. Open Hamr and type `/settings`
-2. Browse categories or search for a specific option from the table above
-3. Select an option to edit its value
-
-Settings are saved to `~/.config/hamr/config.json` automatically.
+</details>
 
 <details>
 <summary><strong>File Structure</strong></summary>
