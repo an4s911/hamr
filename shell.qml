@@ -75,8 +75,12 @@ ShellRoot {
         description: "Toggle Hamr launcher"
         onPressed: {
             if (GlobalStates.launcherOpen && !GlobalStates.launcherMinimized) {
-                GlobalStates.softClose = true
-                GlobalStates.launcherOpen = false
+                if (Persistent.states.launcher.hasUsedMinimize ?? false) {
+                    GlobalStates.launcherMinimized = true
+                } else {
+                    GlobalStates.softClose = true
+                    GlobalStates.launcherOpen = false
+                }
             } else {
                 GlobalStates.launcherMinimized = false
                 GlobalStates.launcherOpen = true
@@ -89,8 +93,12 @@ ShellRoot {
         description: "Toggle Hamr on key release"
         onReleased: {
             if (GlobalStates.launcherOpen && !GlobalStates.launcherMinimized) {
-                GlobalStates.softClose = true
-                GlobalStates.launcherOpen = false
+                if (Persistent.states.launcher.hasUsedMinimize ?? false) {
+                    GlobalStates.launcherMinimized = true
+                } else {
+                    GlobalStates.softClose = true
+                    GlobalStates.launcherOpen = false
+                }
             } else {
                 GlobalStates.launcherMinimized = false
                 GlobalStates.launcherOpen = true
