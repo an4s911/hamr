@@ -18,15 +18,11 @@ Scope {
     // Track if state is pending cleanup (soft close occurred, waiting for timeout or reopen)
     property bool statePendingCleanup: false
     
-    // Track if user has minimized at least once (for intuitive click-outside behavior)
-    // Initialized from persistent state, set to true when user minimizes
-    property bool hasMinimizedThisSession: Persistent.states.launcher.minimized
-    
     Connections {
         target: GlobalStates
         function onLauncherMinimizedChanged() {
             if (GlobalStates.launcherMinimized) {
-                launcherScope.hasMinimizedThisSession = true;
+                Persistent.states.launcher.hasUsedMinimize = true;
             }
         }
     }
@@ -45,6 +41,12 @@ Scope {
         interval: Config.options.behavior.stateRestoreWindowMs
         repeat: false
         onTriggered: {
+            // Guard against race condition: user opened launcher just as timer fired
+            if (GlobalStates.launcherOpen || GlobalStates.launcherMinimized) {
+                launcherScope.statePendingCleanup = false;
+                return;
+            }
+            
             // Timer expired - perform actual cleanup
             if (PluginRunner.isActive()) {
                 LauncherSearch.closePlugin();
@@ -249,7 +251,7 @@ Scope {
                             mouse.y < contentMapped.y || mouse.y > contentMapped.y + content.height) {
                             const action = Config.options.behavior?.clickOutsideAction ?? "intuitive";
                             const shouldMinimize = action === "minimize" || 
-                                (action === "intuitive" && launcherScope.hasMinimizedThisSession);
+                                (action === "intuitive" && Persistent.states.launcher.hasUsedMinimize);
                             
                             if (shouldMinimize) {
                                 GlobalStates.launcherMinimized = true;
