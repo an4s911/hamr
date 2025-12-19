@@ -108,8 +108,8 @@ const StatisticalUtils = {
     return totalWeight > 0 ? weightedSum / totalWeight : 0;
   },
 
-  minConfidenceToShow: 0.3,
-  highConfidence: 0.7,
+  minConfidenceToShow: 0.25,
+  highConfidence: 0.6,
   minEventsForPattern: 3,
 };
 

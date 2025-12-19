@@ -633,28 +633,24 @@ Terms naturally age out based on frecency, so your shortcuts stay relevant as ha
 
 ## Smart Suggestions
 
-When you open Hamr with an empty search, you may see suggested apps at the top marked with a sparkle icon. These are context-aware predictions based on your usage patterns.
+When you open Hamr with an empty search, you may see suggested apps at the top marked with a sparkle icon. These combine your usage frequency with contextual predictions.
 
 **What triggers suggestions:**
 
-| Signal | Example |
-|--------|---------|
-| **Time of day** | Slack suggested at 9am if you always open it then |
-| **Day of week** | Personal apps suggested on weekends |
-| **Workspace** | Browser suggested on workspace 1 where you browse |
-| **Monitor** | Terminal suggested on your vertical monitor |
-| **App sequences** | VS Code suggested after opening Terminal |
-| **Session start** | Email client suggested right after login |
-| **Usage streaks** | Apps you use daily get a confidence boost |
+| Signal | Weight | Example |
+|--------|--------|---------|
+| **App sequences** | High | VS Code suggested after opening Terminal |
+| **Session start** | High | Email client suggested right after login |
+| **Time of day** | Medium | Slack suggested at 9am if you always open it then |
+| **Workspace** | Medium | Browser suggested on workspace 1 |
+| **Day of week** | Low | Personal apps suggested on weekends |
 
 **How it works:**
 
 1. Every app launch records context (time, workspace, monitor, previous app)
-2. Patterns are detected using Wilson score intervals (statistically sound for small samples)
-3. Multiple signals combine into a confidence score
-4. Apps above 30% confidence appear as suggestions (max 2)
-
-**Privacy:** All data stays local in `~/.config/hamr/search-history.json`. Nothing is sent anywhere.
+2. Patterns are detected using [Wilson score intervals](https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval) (statistically sound for small samples)
+3. Context signals combine with frecency (frequency + recency) into a final score
+4. Apps above 25% confidence appear as suggestions (max 2)
 
 **No configuration needed.** Suggestions appear automatically as patterns emerge. Use Hamr normally and it learns your habits within a few days.
 
@@ -751,6 +747,31 @@ Want functionality from a Raycast extension? Use the built-in `create-plugin` wo
 ```
 
 The AI will analyze the Raycast extension, translate the patterns to Hamr's protocol, and create a native Linux plugin. See [`plugins/AGENTS.md`](plugins/AGENTS.md#converting-raycast-extensions) for the full conversion guide.
+
+## Privacy
+
+Hamr is fully local and offline. **No data ever leaves your machine.**
+
+| Data | Location | Purpose |
+|------|----------|---------|
+| Search history | `~/.config/hamr/search-history.json` | Frecency ranking, smart suggestions |
+| Configuration | `~/.config/hamr/config.json` | User preferences |
+| Plugin cache | `~/.config/hamr/plugin-indexes.json` | Faster plugin loading |
+| Clipboard history | Via `cliphist` (system) | Clipboard search |
+
+**What's tracked for smart suggestions:**
+- App launch counts and timestamps
+- Time of day / day of week patterns
+- Workspace and monitor associations
+- App sequence patterns (which app follows another)
+
+**What's NOT tracked:**
+- No network requests, analytics, or telemetry
+- No file contents or document text
+- No keystrokes or input outside Hamr
+- No data shared with plugins (they only receive search queries)
+
+To clear all history: `rm ~/.config/hamr/search-history.json`
 
 ## Credits
 

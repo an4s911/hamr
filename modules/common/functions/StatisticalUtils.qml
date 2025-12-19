@@ -148,7 +148,7 @@ Singleton {
     }
 
     // Confidence thresholds
-    readonly property real minConfidenceToShow: 0.3
-    readonly property real highConfidence: 0.7
+    readonly property real minConfidenceToShow: 0.25
+    readonly property real highConfidence: 0.6
     readonly property int minEventsForPattern: 3
 }
