@@ -14,10 +14,13 @@ Singleton {
     readonly property string currentMonitor: Hyprland.focusedMonitor?.name ?? ""
     
     // Session tracking
-    property string hyprlandInstanceSignature: Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") ?? ""
-    property string previousInstanceSignature: ""
     property bool isNewSession: false
     property real sessionStartTime: 0
+    
+    // DPMS tracking (screen on/off for idle detection)
+    property bool dpmsWasOff: false
+    property real dpmsOnTime: 0
+    readonly property int dpmsResumeWindowMs: 5 * 60 * 1000  // 5 minutes after screen on
     
     // Last launched app tracking (for sequence detection)
     property string lastLaunchedApp: ""
@@ -59,6 +62,13 @@ Singleton {
         return timeSinceSessionStart < 5 * 60 * 1000;  // Within 5 minutes of session start
     }
     
+    // Check if user just returned from idle (DPMS was off, now on)
+    function isResumeFromIdle() {
+        if (!dpmsWasOff || dpmsOnTime === 0) return false;
+        const timeSinceResume = Date.now() - dpmsOnTime;
+        return timeSinceResume < dpmsResumeWindowMs;
+    }
+    
     // Get context object for suggestion calculation
     function getContext() {
         const now = new Date();
@@ -70,20 +80,16 @@ Singleton {
             monitor: currentMonitor,
             lastApp: isWithinSequenceWindow() ? lastLaunchedApp : "",
             isSessionStart: isSessionStart(),
+            isResumeFromIdle: isResumeFromIdle(),
             runningApps: runningAppIds
         };
     }
     
     // Initialize session tracking
     Component.onCompleted: {
-        previousInstanceSignature = Persistent.states.context?.previousHyprlandInstance ?? "";
-        
-        if (hyprlandInstanceSignature !== previousInstanceSignature) {
+        if (Persistent.isNewHyprlandInstance) {
             isNewSession = true;
             sessionStartTime = Date.now();
-            Persistent.states.context = {
-                previousHyprlandInstance: hyprlandInstanceSignature
-            };
         }
     }
     
@@ -93,8 +99,19 @@ Singleton {
         function onRawEvent(event) {
             const eventName = event.name;
             
-            if (eventName === "activewindow" || eventName === "activewindowv2") {
-                // Could track active window changes for more context
+            if (eventName === "dpms") {
+                // DPMS event format: "dpms>>STATE,MONITOR" where STATE is 0 (off) or 1 (on)
+                const data = event.data ?? "";
+                const parts = data.split(",");
+                const state = parts[0];
+                
+                if (state === "0") {
+                    // Screen turned off - user going idle
+                    root.dpmsWasOff = true;
+                } else if (state === "1" && root.dpmsWasOff) {
+                    // Screen turned on after being off - user returning from idle
+                    root.dpmsOnTime = Date.now();
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ Singleton {
     readonly property var weights: ({
         sequence: 0.35,     // Highest - apps opened after others
         session: 0.35,      // High - first app at session start
+        resumeFromIdle: 0.30, // High - apps opened after returning from idle
         time: 0.20,         // Medium - time of day patterns
         workspace: 0.20,    // Medium - workspace segregation
         runningApps: 0.20,  // Medium - correlation with open apps
@@ -158,7 +159,16 @@ Singleton {
             }
         }
         
-        // 7. Running apps correlation (other apps currently open)
+        // 7. Resume from idle (first app after returning from idle/DPMS)
+        if (context.isResumeFromIdle && item.resumeFromIdleCount >= minEvents) {
+            const resumeScore = StatisticalUtils.wilsonScore(item.resumeFromIdleCount, item.count);
+            if (resumeScore > 0.15) {
+                scores.push({ type: 'resumeFromIdle', score: resumeScore, weight: weights.resumeFromIdle });
+                reasons.push("Often opened after returning");
+            }
+        }
+        
+        // 8. Running apps correlation (other apps currently open)
         if (item.launchedAfter && context.runningApps?.length > 0) {
             let runningAppScore = 0;
             let matchedApp = "";
@@ -182,7 +192,7 @@ Singleton {
             }
         }
         
-        // 8. Streak bonus (habit detection)
+        // 9. Streak bonus (habit detection)
         if (item.consecutiveDays >= 3) {
             const streakScore = Math.min(item.consecutiveDays / 10, 1);
             scores.push({ type: 'streak', score: streakScore, weight: weights.streak });

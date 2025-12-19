@@ -63,6 +63,7 @@ Singleton {
             monitorCounts: {},
             launchedAfter: {},
             sessionStartCount: 0,
+            resumeFromIdleCount: 0,
             launchFromEmptyCount: 0,
             consecutiveDays: 0,
             lastConsecutiveDate: ""
@@ -109,6 +110,11 @@ Singleton {
             sessionStartCount++;
         }
         
+        let resumeFromIdleCount = existing.resumeFromIdleCount || 0;
+        if (context && context.isResumeFromIdle) {
+            resumeFromIdleCount++;
+        }
+        
         let launchFromEmptyCount = existing.launchFromEmptyCount || 0;
         if (context && context.launchFromEmpty) {
             launchFromEmptyCount++;
@@ -136,6 +142,7 @@ Singleton {
             monitorCounts: monitorCounts,
             launchedAfter: launchedAfter,
             sessionStartCount: sessionStartCount,
+            resumeFromIdleCount: resumeFromIdleCount,
             launchFromEmptyCount: launchFromEmptyCount,
             consecutiveDays: consecutiveDays,
             lastConsecutiveDate: lastConsecutiveDate
@@ -149,6 +156,7 @@ Singleton {
         baseObj.monitorCounts = smartFields.monitorCounts;
         baseObj.launchedAfter = smartFields.launchedAfter;
         baseObj.sessionStartCount = smartFields.sessionStartCount;
+        baseObj.resumeFromIdleCount = smartFields.resumeFromIdleCount;
         baseObj.launchFromEmptyCount = smartFields.launchFromEmptyCount;
         baseObj.consecutiveDays = smartFields.consecutiveDays;
         baseObj.lastConsecutiveDate = smartFields.lastConsecutiveDate;
@@ -386,6 +394,9 @@ Singleton {
                 }
                 if (scaled.sessionStartCount) {
                     scaled.sessionStartCount = scaled.sessionStartCount * scaleFactor;
+                }
+                if (scaled.resumeFromIdleCount) {
+                    scaled.resumeFromIdleCount = scaled.resumeFromIdleCount * scaleFactor;
                 }
                 if (scaled.launchFromEmptyCount) {
                     scaled.launchFromEmptyCount = scaled.launchFromEmptyCount * scaleFactor;
