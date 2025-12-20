@@ -107,8 +107,8 @@ Scope {
                 // Reset dontAutoCancelSearch
                 launcherScope.dontAutoCancelSearch = false;
 
-                // Hide action hint
-                GlobalStates.hideActionHint();
+                // Hide action tooltip
+                GlobalStates.hideActionToolTip();
             }
         }
     }

@@ -1,0 +1,9 @@
+{
+  "name": "Power",
+  "description": "System power and session controls",
+  "icon": "power_settings_new",
+  "index": {
+    "enabled": true,
+    "reindex": "never"
+  }
+}
