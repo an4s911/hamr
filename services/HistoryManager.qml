@@ -25,7 +25,8 @@ Singleton {
         onLoaded: {
             try {
                 const data = JSON.parse(searchHistoryFileView.text());
-                root.searchHistoryData = data.history || [];
+                const history = data.history || [];
+                root.searchHistoryData = migrateWindowFocusEntries(history);
             } catch (e) {
                 console.error("[SearchHistory] Failed to parse:", e);
                 root.searchHistoryData = [];
@@ -39,6 +40,47 @@ Singleton {
             root.searchHistoryData = [];
             root.historyLoaded = true;
         }
+    }
+
+    function migrateWindowFocusEntries(history) {
+        const windowFocusMap = new Map();
+        const otherEntries = [];
+
+        for (const item of history) {
+            if (item.type === "windowFocus") {
+                const newKey = "windowFocus:" + item.appId;
+                const existing = windowFocusMap.get(newKey);
+
+                if (existing) {
+                    existing.count += item.count;
+                    if (item.lastUsed > existing.lastUsed) {
+                        existing.lastUsed = item.lastUsed;
+                        existing.windowTitle = item.windowTitle;
+                    }
+                } else {
+                    windowFocusMap.set(newKey, {
+                        type: "windowFocus",
+                        key: newKey,
+                        appId: item.appId,
+                        appName: item.appName,
+                        windowTitle: item.windowTitle,
+                        iconName: item.iconName,
+                        count: item.count,
+                        lastUsed: item.lastUsed
+                    });
+                }
+            } else {
+                otherEntries.push(item);
+            }
+        }
+
+        const migratedHistory = [...otherEntries, ...windowFocusMap.values()];
+
+        if (windowFocusMap.size > 0 && migratedHistory.length !== history.length) {
+            searchHistoryFileView.setText(JSON.stringify({ history: migratedHistory }, null, 2));
+        }
+
+        return migratedHistory;
     }
 
     function removeHistoryItem(historyType, identifier) {
@@ -313,7 +355,7 @@ Singleton {
             }
         }
 
-        const key = "windowFocus:" + appId + ":" + windowTitle;
+        const key = "windowFocus:" + appId;
         const existingIndex = newHistory.findIndex(
             h => h.type === "windowFocus" && h.key === key
         );
