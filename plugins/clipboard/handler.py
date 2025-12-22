@@ -46,6 +46,27 @@ def clean_entry(entry: str) -> str:
     return re.sub(r"^\s*\S+\s+", "", entry)
 
 
+def get_full_entry_content(entry: str) -> str:
+    """Get the full content of a clipboard entry using cliphist decode.
+
+    cliphist list truncates long entries, so we need to decode for full content.
+    """
+    try:
+        proc = subprocess.run(
+            f"printf '%s' '{shell_escape(entry)}' | cliphist decode",
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if proc.returncode == 0:
+            return proc.stdout
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+    # Fallback to cleaned entry (truncated)
+    return clean_entry(entry)
+
+
 def get_entry_id(entry: str) -> str:
     """Extract the cliphist ID from entry"""
     match = re.match(r"^\s*(\S+)\s+", entry)
@@ -193,12 +214,16 @@ def get_entry_results(
     query: str = "",
     filter_type: str = "",
     ocr_texts: dict[str, str] | None = None,
+    limit: int = 50,
 ) -> list[dict]:
     """Convert clipboard entries to result format"""
     results = []
     ocr_texts = ocr_texts or {}
 
     for entry in entries:
+        # Stop once we have enough results
+        if len(results) >= limit:
+            break
         # Apply type filter
         is_img = is_image(entry)
         if filter_type == "images" and not is_img:
@@ -253,6 +278,52 @@ def get_entry_results(
 
         if thumbnail:
             result["thumbnail"] = thumbnail
+
+        # Add preview panel data
+        if is_img and thumbnail:
+            preview_metadata = []
+            img_dims = get_image_dimensions(entry)
+            if img_dims:
+                preview_metadata.append(
+                    {"label": "Size", "value": f"{img_dims[0]}x{img_dims[1]}"}
+                )
+            ocr_text = ocr_texts.get(entry, "")
+            if ocr_text:
+                preview_metadata.append(
+                    {
+                        "label": "OCR",
+                        "value": ocr_text[:200]
+                        + ("..." if len(ocr_text) > 200 else ""),
+                    }
+                )
+
+            result["preview"] = {
+                "type": "image",
+                "content": thumbnail,
+                "title": display,
+                "metadata": preview_metadata,
+                "actions": [
+                    {"id": "copy", "name": "Copy", "icon": "content_copy"},
+                ],
+            }
+        elif not is_img:
+            # Text preview - show full content (use cliphist decode for untruncated content)
+            full_content = get_full_entry_content(entry)
+            char_count = len(full_content)
+            line_count = full_content.count("\n") + 1
+
+            result["preview"] = {
+                "type": "text",
+                "content": full_content,
+                "title": "Text Clip",
+                "metadata": [
+                    {"label": "Characters", "value": str(char_count)},
+                    {"label": "Lines", "value": str(line_count)},
+                ],
+                "actions": [
+                    {"id": "copy", "name": "Copy", "icon": "content_copy"},
+                ],
+            }
 
         results.append(result)
 

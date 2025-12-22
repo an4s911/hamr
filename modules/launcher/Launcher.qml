@@ -470,6 +470,13 @@ Scope {
                     } else if (event.key === Qt.Key_M && (event.modifiers & Qt.ControlModifier)) {
                         GlobalStates.launcherMinimized = true;
                         event.accepted = true;
+                    } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)) {
+                        // Pin current preview to screen
+                        if (GlobalStates.previewPanelVisible) {
+                            const globalPos = previewPanel.mapToGlobal(previewPanel.width / 2, 0);
+                            GlobalStates.detachCurrentPreview(globalPos.x, globalPos.y);
+                        }
+                        event.accepted = true;
                     }
                 }
 

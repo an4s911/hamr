@@ -24,12 +24,13 @@ Rectangle {
     property bool detachable: preview?.detachable ?? true
     
     readonly property real panelWidth: Appearance.sizes.searchWidth * 0.75
+    readonly property real maxPanelHeight: 500
     
     visible: preview !== null
     opacity: visible ? 1 : 0
     
     implicitWidth: panelWidth
-    implicitHeight: contentColumn.implicitHeight + 24
+    implicitHeight: Math.min(maxPanelHeight, contentColumn.implicitHeight + 24)
     
     radius: Appearance.rounding.normal
     color: Appearance.colors.colBackgroundSurfaceContainer
@@ -54,6 +55,7 @@ Rectangle {
         }
         spacing: 8
         
+        // Fixed header
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -116,36 +118,36 @@ Rectangle {
             visible: root.previewTitle !== ""
         }
         
-        Loader {
-            id: contentLoader
+        // Scrollable content area
+        ScrollView {
+            id: mainScrollView
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: Math.min(scrollContent.implicitHeight, root.maxPanelHeight - 120)
+            clip: true
             
-            sourceComponent: {
-                switch (root.previewType) {
-                    case "image": return imagePreview;
-                    case "markdown": return markdownPreview;
-                    case "text": return textPreview;
-                    case "metadata": return metadataPreview;
-                    default: return null;
-                }
+            ScrollBar.vertical: StyledScrollBar {
+                policy: ScrollBar.AsNeeded
             }
-        }
-        
-        Component {
-            id: imagePreview
+            ScrollBar.horizontal: ScrollBar {
+                policy: ScrollBar.AlwaysOff
+            }
             
             ColumnLayout {
+                id: scrollContent
+                width: mainScrollView.availableWidth
                 spacing: 8
                 
+                // Image preview
                 Rectangle {
+                    visible: root.previewType === "image"
                     Layout.fillWidth: true
                     Layout.preferredHeight: {
+                        if (!visible) return 0;
                         if (imageItem.status !== Image.Ready) return 200;
                         const aspectRatio = imageItem.sourceSize.height / Math.max(1, imageItem.sourceSize.width);
-                        const availableWidth = root.panelWidth - 24 - 8;
+                        const availableWidth = root.panelWidth - 32 - 8;
                         const calculatedHeight = availableWidth * aspectRatio;
-                        return Math.max(100, Math.min(350, calculatedHeight));
+                        return Math.max(100, Math.min(300, calculatedHeight));
                     }
                     radius: Appearance.rounding.verysmall
                     color: Appearance.colors.colSurfaceContainerLow
@@ -155,7 +157,7 @@ Rectangle {
                         id: imageItem
                         anchors.fill: parent
                         anchors.margins: 4
-                        source: root.previewContent ? "file://" + root.previewContent : ""
+                        source: root.previewType === "image" && root.previewContent ? "file://" + root.previewContent : ""
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         
@@ -167,53 +169,32 @@ Rectangle {
                     }
                 }
                 
-                ColumnLayout {
-                    id: metadataCol
-                    Layout.fillWidth: true
-                    spacing: 4
-                    visible: root.previewMetadata.length > 0
-                    
-                    Repeater {
-                        model: root.previewMetadata
-                        
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            
-                            StyledText {
-                                text: modelData.label + ":"
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                color: Appearance.m3colors.m3outline
-                            }
-                            
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: modelData.value
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                color: Appearance.m3colors.m3onSurfaceVariant
-                                elide: Text.ElideRight
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        Component {
-            id: markdownPreview
-            
-            ScrollView {
-                clip: true
-                
-                ScrollBar.vertical: StyledScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
-                ScrollBar.horizontal: ScrollBar {
-                    policy: ScrollBar.AlwaysOff
-                }
-                
+                // Text preview
                 TextArea {
-                    width: parent.availableWidth
+                    id: textContentArea
+                    visible: root.previewType === "text"
+                    Layout.fillWidth: true
+                    text: root.previewContent
+                    textFormat: TextEdit.PlainText
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
+                    
+                    font.family: Appearance.font.family.monospace
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.m3colors.m3onSurface
+                    selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
+                    selectionColor: Appearance.colors.colSecondaryContainer
+                    
+                    background: null
+                    padding: 0
+                }
+                
+                // Markdown preview
+                TextArea {
+                    id: markdownContentArea
+                    visible: root.previewType === "markdown"
+                    Layout.fillWidth: true
                     text: root.previewContent
                     textFormat: TextEdit.MarkdownText
                     readOnly: true
@@ -238,77 +219,31 @@ Rectangle {
                         cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
                     }
                 }
-            }
-        }
-        
-        Component {
-            id: textPreview
-            
-            ScrollView {
-                clip: true
                 
-                ScrollBar.vertical: StyledScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
-                ScrollBar.horizontal: ScrollBar {
-                    policy: ScrollBar.AlwaysOff
-                }
-                
-                TextArea {
-                    width: parent.availableWidth
-                    text: root.previewContent
-                    textFormat: TextEdit.PlainText
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.Wrap
-                    
-                    font.family: Appearance.font.family.monospace
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.m3colors.m3onSurface
-                    selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
-                    selectionColor: Appearance.colors.colSecondaryContainer
-                    
-                    background: null
-                    padding: 0
-                }
-            }
-        }
-        
-        Component {
-            id: metadataPreview
-            
-            ScrollView {
-                clip: true
-                
-                ScrollBar.vertical: StyledScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
-                
+                // Metadata section
                 ColumnLayout {
-                    width: parent.availableWidth
-                    spacing: 6
+                    visible: root.previewMetadata.length > 0
+                    Layout.fillWidth: true
+                    spacing: 4
                     
                     Repeater {
                         model: root.previewMetadata
                         
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 12
+                            spacing: 8
                             
                             StyledText {
-                                Layout.preferredWidth: 100
-                                text: modelData.label
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                font.weight: Font.Medium
+                                text: modelData.label + ":"
+                                font.pixelSize: Appearance.font.pixelSize.smaller
                                 color: Appearance.m3colors.m3outline
-                                horizontalAlignment: Text.AlignRight
                             }
                             
                             StyledText {
                                 Layout.fillWidth: true
                                 text: modelData.value
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                color: Appearance.m3colors.m3onSurface
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: Appearance.m3colors.m3onSurfaceVariant
                                 wrapMode: Text.Wrap
                             }
                         }
@@ -317,6 +252,7 @@ Rectangle {
             }
         }
         
+        // Fixed action buttons at bottom
         RowLayout {
             Layout.fillWidth: true
             Layout.topMargin: 8

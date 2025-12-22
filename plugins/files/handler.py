@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Search history path (same as LauncherSearch.qml)
@@ -199,6 +200,129 @@ def get_file_icon(path: str) -> str:
     return icon_map.get(ext, "description")
 
 
+def format_size(size: int) -> str:
+    """Format file size in human readable format"""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+def get_file_preview(path: str) -> dict | None:
+    """Generate preview data for a file"""
+    if not os.path.exists(path):
+        return None
+
+    is_dir = os.path.isdir(path)
+    name = os.path.basename(path) or path
+    ext = Path(path).suffix.lower()
+
+    # Get file stats
+    try:
+        stat = os.stat(path)
+        size = stat.st_size
+        mtime = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+    except OSError:
+        size = 0
+        mtime = "Unknown"
+
+    metadata = [
+        {"label": "Size", "value": format_size(size) if not is_dir else "Directory"},
+        {"label": "Modified", "value": mtime},
+        {"label": "Path", "value": path},
+    ]
+
+    actions = [
+        {"id": "open", "name": "Open", "icon": "open_in_new"},
+        {"id": "copy_path", "name": "Copy Path", "icon": "content_copy"},
+        {"id": "open_folder", "name": "Open Folder", "icon": "folder_open"},
+    ]
+
+    # Image files - show image preview
+    if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"]:
+        return {
+            "type": "image",
+            "content": path,
+            "title": name,
+            "metadata": metadata,
+            "actions": actions,
+        }
+
+    # Text/code files - show text preview
+    text_extensions = [
+        ".txt",
+        ".md",
+        ".rst",
+        ".py",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".rs",
+        ".go",
+        ".java",
+        ".kt",
+        ".html",
+        ".css",
+        ".scss",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".xml",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".conf",
+        ".cfg",
+        ".ini",
+        ".lua",
+        ".vim",
+        ".rb",
+        ".php",
+        ".sql",
+        ".r",
+        ".m",
+        ".swift",
+    ]
+    if ext in text_extensions:
+        try:
+            with open(path, "r", errors="replace") as f:
+                content = f.read(5000)  # Read first 5KB
+                if len(content) == 5000:
+                    content += "\n\n... (truncated)"
+
+            # Use markdown for .md files
+            preview_type = "markdown" if ext == ".md" else "text"
+
+            return {
+                "type": preview_type,
+                "content": content,
+                "title": name,
+                "metadata": metadata,
+                "actions": actions,
+            }
+        except Exception:
+            pass
+
+    # For other files, show metadata only
+    if not is_dir:
+        return {
+            "type": "metadata",
+            "content": "",
+            "title": name,
+            "metadata": metadata,
+            "actions": actions,
+        }
+
+    return None
+
+
 def path_to_result(path: str, show_actions: bool = True) -> dict:
     """Convert a file path to a result dict"""
     # Normalize path (remove trailing slash for directories)
@@ -229,6 +353,11 @@ def path_to_result(path: str, show_actions: bool = True) -> dict:
     ext = Path(path).suffix.lower()
     if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]:
         result["thumbnail"] = path
+
+    # Add preview panel data
+    preview = get_file_preview(path)
+    if preview:
+        result["preview"] = preview
 
     return result
 

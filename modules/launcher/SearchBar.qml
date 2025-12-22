@@ -141,6 +141,31 @@ RowLayout {
             colSymbol: Appearance.colors.colOnPrimaryContainer
             text: PluginRunner.activePlugin?.manifest?.icon ?? "extension"
             
+            RotationAnimator {
+                id: spinAnimation
+                target: pluginIcon
+                running: PluginRunner.pluginBusy
+                from: 0
+                to: 360
+                duration: 1000
+                loops: Animation.Infinite
+                
+                onRunningChanged: {
+                    if (!running) {
+                        resetRotation.start();
+                    }
+                }
+            }
+            
+            NumberAnimation {
+                id: resetRotation
+                target: pluginIcon
+                property: "rotation"
+                to: 0
+                duration: 150
+                easing.type: Easing.OutCubic
+            }
+            
             SequentialAnimation {
                 id: scaleIn
                 ParallelAnimation {
