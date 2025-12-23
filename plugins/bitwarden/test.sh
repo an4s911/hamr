@@ -20,8 +20,8 @@ source "$SCRIPT_DIR/../test-helpers.sh"
 TEST_NAME="Bitwarden Plugin Tests"
 HANDLER="$SCRIPT_DIR/handler.py"
 
-# Cache directory (same as handler.py)
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hamr/bitwarden"
+# Cache directory (same as handler.py - uses runtime dir for security)
+CACHE_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hamr/bitwarden"
 ITEMS_CACHE_FILE="$CACHE_DIR/items.json"
 BACKUP_CACHE="/tmp/bw-cache-backup-$$.json"
 
