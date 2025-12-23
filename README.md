@@ -62,7 +62,7 @@ Powered by [qalculate](https://qalculate.github.io/) - supports 150+ currencies,
 | Plugin | Trigger | Description |
 |--------|---------|-------------|
 | `apps` | `/apps` | App drawer with categories (like rofi/dmenu) |
-| `bitwarden` | `/bitwarden` | Password manager with local caching |
+| `bitwarden` | `/bitwarden` | Password manager with keyring integration |
 | `calculate` | `=` or pattern | Calculator with currency, units, and temperature |
 | `clipboard` | `;` | Clipboard history with OCR search, filter by type |
 | `create-plugin` | `/create-plugin` | AI helper to create new plugins (requires [OpenCode](https://opencode.ai)) |
@@ -145,6 +145,7 @@ The install script will:
 - `tesseract` - OCR for screenshot text search
 - `imagemagick` - Alternative thumbnail generation
 - `bitwarden-cli` - Bitwarden password manager plugin
+- `python-keyring` - Secure session storage for Bitwarden plugin
 - `slurp` - Screen region selection
 - `wf-recorder` - Screen recording
 
@@ -246,23 +247,6 @@ Add to `~/.config/hypr/hyprland.conf`:
 ```bash
 exec-once = hamr
 ```
-
-**4. (Optional) Pass shell environment variables**
-
-By default, Hamr inherits environment from the display manager, not your shell profile. If you need plugins to access environment variables set in your shell (e.g., `BW_SESSION` for Bitwarden), launch Hamr through an interactive login shell:
-
-```bash
-# Zsh
-exec-once = zsh -ic "hamr"
-
-# Bash
-exec-once = bash -ic "hamr"
-
-# Fish
-exec-once = fish -c "hamr"
-```
-
-This ensures variables exported in `.zshrc`, `.bashrc`, or `config.fish` are available to Hamr and its plugins.
 
 ### Updating
 
