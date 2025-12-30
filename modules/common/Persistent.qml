@@ -3,11 +3,12 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.modules.common.functions
 
 Singleton {
     id: root
     property alias states: persistentStatesJsonAdapter
-    property string fileDir: `${Directories.state}/hamr`
+    property string fileDir: FileUtils.trimFileProtocol(`${Directories.state}/hamr`)
     property string fileName: "states.json"
     property string filePath: `${root.fileDir}/${root.fileName}`
 
