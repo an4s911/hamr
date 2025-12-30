@@ -221,8 +221,6 @@ Scope {
             function regrabFocus() {
                 if (!GlobalStates.launcherOpen)
                     return;
-                if (GlobalStates.imageBrowserOpen)
-                    return;
                 if (!grab.canBeActive)
                     return;
 
@@ -238,9 +236,7 @@ Scope {
                         grab.deactivate();
                     } else {
                         // Per-screen UI setup on open
-                        if (!GlobalStates.imageBrowserOpen) {
-                            delayedGrabTimer.start();
-                        }
+                        delayedGrabTimer.start();
                     }
                 }
             }
@@ -258,26 +254,12 @@ Scope {
                 }
             }
 
-            // Pause launcher focus grab while ImageBrowser is open
-            Connections {
-                target: GlobalStates
-                function onImageBrowserOpenChanged() {
-                    if (GlobalStates.imageBrowserOpen) {
-                        grab.deactivate();
-                    } else if (GlobalStates.launcherOpen) {
-                        delayedGrabTimer.start();
-                    }
-                }
-            }
-
             Timer {
                 id: delayedGrabTimer
                 interval: 20 // Race condition delay
                 repeat: false
                 onTriggered: {
                     if (!grab.canBeActive)
-                        return;
-                    if (GlobalStates.imageBrowserOpen)
                         return;
                     if (GlobalStates.launcherOpen) {
                         grab.activate();
@@ -502,8 +484,14 @@ Scope {
 
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Escape) {
-                        // Priority: plugin > exclusive mode > minimize/close launcher
-                        if (PluginRunner.isActive()) {
+                        // Priority: imageBrowser > plugin > exclusive mode > minimize/close launcher
+                        if (GlobalStates.imageBrowserOpen) {
+                            if (GlobalStates.imageBrowserConfig?.workflowId) {
+                                GlobalStates.cancelImageBrowser();
+                            } else {
+                                GlobalStates.closeImageBrowser();
+                            }
+                        } else if (PluginRunner.isActive()) {
                             LauncherSearch.handlePluginEscape();
                         } else if (LauncherSearch.isInExclusiveMode()) {
                             LauncherSearch.exitExclusiveMode();

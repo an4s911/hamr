@@ -197,12 +197,22 @@ SETTINGS_SCHEMA: dict[str, dict[str, dict]] = {
         "imageBrowserWidth": {
             "default": 1200,
             "type": "number",
-            "description": "Image browser width (px)",
+            "description": "Image browser width (legacy panel, px)",
         },
         "imageBrowserHeight": {
             "default": 690,
             "type": "number",
-            "description": "Image browser height (px)",
+            "description": "Image browser height (legacy panel, px)",
+        },
+        "imageBrowserGridWidth": {
+            "default": 900,
+            "type": "number",
+            "description": "Image browser grid width (integrated, px)",
+        },
+        "imageBrowserGridHeight": {
+            "default": 600,
+            "type": "number",
+            "description": "Image browser grid height (integrated, px)",
         },
         "windowPickerMaxWidth": {
             "default": 350,

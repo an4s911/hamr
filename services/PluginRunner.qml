@@ -1162,6 +1162,7 @@ Singleton {
                  
              case "imageBrowser":
                  if (response.imageBrowser) {
+                     const isInitial = root.navigationDepth === 0;
                      const config = {
                          directory: response.imageBrowser.directory ?? "",
                          title: response.imageBrowser.title ?? root.activePlugin?.manifest?.name ?? "Select Image",
@@ -1169,9 +1170,12 @@ Singleton {
                          actions: response.imageBrowser.actions ?? [],
                          workflowId: root.activePlugin?.id ?? "",
                          enableOcr: response.imageBrowser.enableOcr ?? false,
-                         isInitialView: root.navigationDepth === 0
+                         isInitialView: isInitial
                      };
-                     root.navigationDepth++;
+                     // Only increment depth if not the initial view
+                     if (!isInitial) {
+                         root.navigationDepth++;
+                     }
                      GlobalStates.openImageBrowserForPlugin(config);
                  }
                  break;
@@ -1205,8 +1209,13 @@ Singleton {
          }
          
          function onImageBrowserCancelled() {
-             if (root.navigationDepth > 0) root.navigationDepth--;
-             if (root.activePlugin) root.goBack();
+             if (root.navigationDepth > 0) {
+                 root.navigationDepth--;
+                 if (root.activePlugin) root.goBack();
+             } else {
+                 // At initial view, close the plugin entirely
+                 root.closePlugin();
+             }
          }
      }
      

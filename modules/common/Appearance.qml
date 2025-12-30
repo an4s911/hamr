@@ -361,6 +361,9 @@ Singleton {
         property real imageBrowserHeight: Config.options.sizes?.imageBrowserHeight ?? 690
         property real imageBrowserItemMargins: 8
         property real imageBrowserItemPadding: 6
+        // Integrated image browser grid (replaces results list)
+        property real imageBrowserGridWidth: Config.options.sizes?.imageBrowserGridWidth ?? 900
+        property real imageBrowserGridHeight: Config.options.sizes?.imageBrowserGridHeight ?? 600
         // Window picker from Config
         property real windowPickerMaxWidth: Config.options.sizes?.windowPickerMaxWidth ?? 350
         property real windowPickerMaxHeight: Config.options.sizes?.windowPickerMaxHeight ?? 220

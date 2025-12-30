@@ -8,7 +8,6 @@
 
 import qs.modules.common
 import qs.modules.launcher
-import qs.modules.imageBrowser
 
 import QtQuick
 import QtQuick.Window
@@ -26,7 +25,6 @@ ShellRoot {
     }
 
     Launcher {}
-    ImageBrowser {}
     WindowPicker {}
 
     // Reload popup for development

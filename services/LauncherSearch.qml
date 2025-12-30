@@ -549,6 +549,10 @@ Singleton {
 
     onQueryChanged: {
          if (PluginRunner.isActive()) {
+             // Don't send queries to plugin when imageBrowser is open - filter locally instead
+             if (GlobalStates.imageBrowserOpen) {
+                 return;
+             }
              if (!root.pluginStarting && !root.pluginClearing) {
                  if (PluginRunner.inputMode === "realtime") {
                      pluginSearchTimer.restart();

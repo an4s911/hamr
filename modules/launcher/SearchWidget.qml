@@ -18,6 +18,7 @@ Item {
     property bool showResults: searchingText != "" || LauncherSearch.results.length > 0
     property bool showCard: PluginRunner.pluginCard !== null
     property bool showForm: PluginRunner.pluginForm !== null
+    readonly property bool showImageBrowser: GlobalStates.imageBrowserOpen
     
     implicitWidth: searchWidgetContent.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: searchWidgetContent.implicitHeight + searchWidgetContent.anchors.topMargin + Appearance.sizes.elevationMargin * 2
@@ -116,14 +117,21 @@ Item {
             topMargin: Appearance.sizes.elevationMargin * 20
         }
         clip: true
-        implicitWidth: columnLayout.implicitWidth
+        implicitWidth: root.showImageBrowser 
+            ? Appearance.sizes.imageBrowserGridWidth + 12  // grid width + margins
+            : columnLayout.implicitWidth
         implicitHeight: columnLayout.implicitHeight
         radius: Appearance.rounding.normal
         color: Appearance.colors.colBackgroundSurfaceContainer
 
         Behavior on implicitHeight {
             id: searchHeightBehavior
-            enabled: GlobalStates.launcherOpen && (root.showResults || root.showCard)
+            enabled: GlobalStates.launcherOpen && (root.showResults || root.showCard || root.showImageBrowser)
+            animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+        }
+
+        Behavior on implicitWidth {
+            enabled: GlobalStates.launcherOpen
             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
         }
         
@@ -142,7 +150,8 @@ Item {
             id: columnLayout
             anchors {
                 top: parent.top
-                horizontalCenter: parent.horizontalCenter
+                left: parent.left
+                right: parent.right
             }
             spacing: 0
 
@@ -153,6 +162,7 @@ Item {
                 implicitWidth: searchBar.fixedWidth + 12
                 implicitHeight: searchBar.implicitHeight + 12
                 Layout.margins: 6
+                Layout.fillWidth: true
                 radius: Appearance.rounding.small
                 color: Appearance.colors.colSurfaceContainerHigh
                 border.width: 1
@@ -161,8 +171,11 @@ Item {
                 SearchBar {
                     id: searchBar
                     anchors.left: parent.left
+                    anchors.right: parent.right
                     anchors.leftMargin: 6
+                    anchors.rightMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
+                    expandSearchInput: root.showImageBrowser
                      Synchronizer on searchingText {
                          property alias source: root.searchingText
                      }
@@ -172,6 +185,12 @@ Item {
                     onDragEnded: root.dragEnded()
 
                     onNavigateDown: {
+                        if (root.showImageBrowser) {
+                            if (imageBrowserLoader.item?.gridComponent) {
+                                imageBrowserLoader.item.gridComponent.moveSelection(imageBrowserLoader.item.gridComponent.columns);
+                            }
+                            return;
+                        }
                         if (appResults.count === 0) return;
                         if (appResults.currentIndex < appResults.count - 1) {
                             appResults.currentIndex++;
@@ -180,6 +199,12 @@ Item {
                         }
                     }
                     onNavigateUp: {
+                        if (root.showImageBrowser) {
+                            if (imageBrowserLoader.item?.gridComponent) {
+                                imageBrowserLoader.item.gridComponent.moveSelection(-imageBrowserLoader.item.gridComponent.columns);
+                            }
+                            return;
+                        }
                         if (appResults.count === 0) return;
                         if (appResults.currentIndex > 0) {
                             appResults.currentIndex--;
@@ -187,7 +212,37 @@ Item {
                             appResults.currentIndex = appResults.count - 1;
                         }
                     }
+                    onNavigateLeft: {
+                        if (root.showImageBrowser) {
+                            if (imageBrowserLoader.item?.gridComponent) {
+                                imageBrowserLoader.item.gridComponent.moveSelection(-1);
+                            }
+                        }
+                    }
+                    onNavigateRight: {
+                        if (root.showImageBrowser) {
+                            if (imageBrowserLoader.item?.gridComponent) {
+                                imageBrowserLoader.item.gridComponent.moveSelection(1);
+                            }
+                        } else {
+                            // Original Ctrl+L behavior: select current item
+                            if (appResults.count > 0 && appResults.currentIndex >= 0) {
+                                let currentItem = appResults.itemAtIndex(appResults.currentIndex);
+                                if (currentItem?.clicked) {
+                                    currentItem.clicked();
+                                }
+                            }
+                        }
+                    }
                     onSelectCurrent: {
+                        // If imageBrowser is open, activate current image
+                        if (root.showImageBrowser) {
+                            if (imageBrowserLoader.item?.gridComponent) {
+                                imageBrowserLoader.item.gridComponent.activateCurrent();
+                            }
+                            return;
+                        }
+
                         // If there's a pending confirmation dialog, Enter confirms it
                         if (actionBar.pendingConfirmAction !== null) {
                             const actionId = actionBar.pendingConfirmAction?.id ?? "";
@@ -285,7 +340,7 @@ Item {
                 Layout.bottomMargin: 8
                 Layout.preferredHeight: 34
                 
-                showSeparator: root.showResults || root.showCard || root.showForm || PluginRunner.pluginBusy
+                showSeparator: root.showResults || root.showCard || root.showForm || PluginRunner.pluginBusy || root.showImageBrowser
                 
                 readonly property bool inSearchMode: {
                     const q = root.searchingText;
@@ -293,10 +348,19 @@ Item {
                     return prefixes.some(p => q.startsWith(p)) || LauncherSearch.isInExclusiveMode();
                 }
                 
-                mode: PluginRunner.isActive() ? "plugin" : (inSearchMode ? "search" : "hints")
+                mode: root.showImageBrowser ? "plugin" : (PluginRunner.isActive() ? "plugin" : (inSearchMode ? "search" : "hints"))
                 
                 actions: {
-                    if (PluginRunner.isActive()) {
+                    if (root.showImageBrowser) {
+                        const config = GlobalStates.imageBrowserConfig;
+                        const customActions = config?.actions ?? [];
+                        return customActions.map((action, idx) => ({
+                            id: action.id,
+                            icon: action.icon ?? "play_arrow",
+                            name: action.name ?? action.id,
+                            shortcut: `Ctrl+${idx + 1}`
+                        }));
+                    } else if (PluginRunner.isActive()) {
                         return PluginRunner.pluginActions;
                     } else if (inSearchMode) {
                         return [];
@@ -312,14 +376,27 @@ Item {
                 
                 navigationDepth: PluginRunner.navigationDepth
                 
-                hintActions: root.showResults && !PluginRunner.isActive() && !inSearchMode ? [
-                    { key: "^J", label: "down" },
-                    { key: "^K", label: "up" },
-                    { key: "Tab", label: "actions" },
-                ] : []
+                hintActions: {
+                    if (root.showImageBrowser) {
+                        return [
+                            { key: "^hjkl", label: "navigate" },
+                            { key: "Enter", label: "select" },
+                        ];
+                    } else if (root.showResults && !PluginRunner.isActive() && !inSearchMode) {
+                        return [
+                            { key: "^J", label: "down" },
+                            { key: "^K", label: "up" },
+                            { key: "Tab", label: "actions" },
+                        ];
+                    }
+                    return [];
+                }
                 
                 onActionClicked: (actionId, wasConfirmed) => {
-                    if (PluginRunner.isActive()) {
+                    if (root.showImageBrowser) {
+                        // Execute imageBrowser action on currently selected image
+                        imageBrowserLoader.executeActionOnCurrent(actionId);
+                    } else if (PluginRunner.isActive()) {
                         PluginRunner.executePluginAction(actionId, wasConfirmed);
                     } else if (!actionBar.inSearchMode) {
                         searchBar.searchInput.text = actionId;
@@ -329,6 +406,14 @@ Item {
                 }
                 
                 onBackClicked: {
+                    if (root.showImageBrowser) {
+                        if (GlobalStates.imageBrowserConfig?.workflowId) {
+                            GlobalStates.cancelImageBrowser();
+                        } else {
+                            GlobalStates.closeImageBrowser();
+                        }
+                        return;
+                    }
                     if (PluginRunner.isActive()) {
                         if (root.showForm) {
                             PluginRunner.cancelForm();
@@ -342,6 +427,9 @@ Item {
                 }
                 
                 onHomeClicked: {
+                    if (root.showImageBrowser) {
+                        GlobalStates.closeImageBrowser();
+                    }
                     LauncherSearch.exitPlugin();
                 }
             }
@@ -425,7 +513,7 @@ Item {
 
              Rectangle {
                 id: resultsContainer
-                visible: root.showResults && !root.showCard && !root.showForm && !(PluginRunner.pluginBusy && PluginRunner.inputMode === "submit")
+                visible: root.showResults && !root.showCard && !root.showForm && !(PluginRunner.pluginBusy && PluginRunner.inputMode === "submit") && !root.showImageBrowser
                 Layout.fillWidth: true
                 Layout.leftMargin: 6
                 Layout.rightMargin: 6
@@ -585,6 +673,54 @@ Item {
                         GradientStop { position: 0.80; color: Qt.rgba(0, 0, 0, 0.08) }
                         GradientStop { position: 0.95; color: Qt.rgba(0, 0, 0, 0.15) }
                         GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.20) }
+                    }
+                }
+            }
+
+            Loader {
+                id: imageBrowserLoader
+                active: root.showImageBrowser
+                visible: active
+                Layout.preferredWidth: Appearance.sizes.imageBrowserGridWidth
+                Layout.leftMargin: 6
+                Layout.rightMargin: 6
+                Layout.bottomMargin: 6
+                Layout.topMargin: 4
+
+                function executeActionOnCurrent(actionId) {
+                    if (item && item.gridComponent) {
+                        item.gridComponent.executeActionOnCurrent(actionId);
+                    }
+                }
+
+                sourceComponent: Rectangle {
+                    id: imageBrowserContainer
+                    property alias gridComponent: imageBrowserGrid
+                    
+                    radius: Appearance.rounding.small
+                    color: Appearance.colors.colSurfaceContainerLow
+                    border.width: 1
+                    border.color: Appearance.colors.colOutlineVariant
+                    implicitWidth: imageBrowserGrid.implicitWidth
+                    implicitHeight: imageBrowserGrid.implicitHeight
+
+                    ImageBrowserGrid {
+                        id: imageBrowserGrid
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        focus: true
+
+                        onImageSelected: (filePath, actionId) => {
+                            GlobalStates.imageBrowserSelection(filePath, actionId);
+                        }
+
+                        onCancelled: {
+                            if (GlobalStates.imageBrowserConfig?.workflowId) {
+                                GlobalStates.cancelImageBrowser();
+                            } else {
+                                GlobalStates.closeImageBrowser();
+                            }
+                        }
                     }
                 }
             }

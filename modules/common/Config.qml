@@ -179,9 +179,12 @@ Singleton {
                 property int maxResultsHeight: 600
                 property int resultIconSize: 40
                 
-                // Image browser dimensions
+                // Image browser dimensions (legacy separate panel)
                 property int imageBrowserWidth: 1200
                 property int imageBrowserHeight: 690
+                // Image browser grid (integrated into launcher)
+                property int imageBrowserGridWidth: 900
+                property int imageBrowserGridHeight: 600
                 
                 // Window picker preview
                 property int windowPickerMaxWidth: 350

@@ -17,6 +17,7 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
     property bool showMinimizeButton: dragHandleArea.containsMouse || minimizeArea.containsMouse
+    property bool expandSearchInput: false
     
     readonly property real fixedWidth: 30 + spacing + Appearance.sizes.searchWidth + spacing + 24 + spacing + 24 + 8
     
@@ -25,6 +26,9 @@ RowLayout {
     signal dragEnded()
     
     readonly property string pluginPlaceholder: PluginRunner.isActive() ? PluginRunner.pluginPlaceholder : ""
+    readonly property string imageBrowserPlaceholder: GlobalStates.imageBrowserOpen 
+        ? (GlobalStates.imageBrowserConfig?.enableOcr ? "Search images or text..." : "Search images...")
+        : ""
     readonly property string exclusiveModePlaceholder: {
         switch (LauncherSearch.exclusiveMode) {
             case "action": return "Search actions...";
@@ -218,25 +222,22 @@ RowLayout {
 
     signal navigateDown()
     signal navigateUp()
+    signal navigateLeft()
+    signal navigateRight()
     signal selectCurrent()
 
     ToolbarTextField {
         id: searchInput
         Layout.topMargin: 4
         Layout.bottomMargin: 4
+        Layout.fillWidth: root.expandSearchInput
         implicitHeight: Appearance.sizes.searchInputHeight
         focus: GlobalStates.launcherOpen
         font.pixelSize: Appearance.font.pixelSize.small
-        placeholderText: root.pluginPlaceholder !== "" ? root.pluginPlaceholder : 
+        placeholderText: root.imageBrowserPlaceholder !== "" ? root.imageBrowserPlaceholder :
+                         root.pluginPlaceholder !== "" ? root.pluginPlaceholder : 
                          root.exclusiveModePlaceholder !== "" ? root.exclusiveModePlaceholder : "It's hamr time!"
-        implicitWidth: Appearance.sizes.searchWidth + (root.showMinimizeButton ? 0 : 23)
-
-        Behavior on implicitWidth {
-            NumberAnimation {
-                duration: 150
-                easing.type: Easing.OutCubic
-            }
-        }
+        implicitWidth: root.expandSearchInput ? -1 : (Appearance.sizes.searchWidth + (root.showMinimizeButton ? 0 : 23))
 
         onTextChanged: searchDebounce.restart()
          
@@ -291,6 +292,11 @@ RowLayout {
                     return;
                 }
                 
+                if (event.key === Qt.Key_H) {
+                    root.navigateLeft();
+                    event.accepted = true;
+                    return;
+                }
                 if (event.key === Qt.Key_J) {
                     root.navigateDown();
                     event.accepted = true;
@@ -302,7 +308,7 @@ RowLayout {
                     return;
                 }
                 if (event.key === Qt.Key_L) {
-                    root.selectCurrent();
+                    root.navigateRight();
                     event.accepted = true;
                     return;
                 }
