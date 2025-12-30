@@ -34,7 +34,7 @@ Hamr is an extensible launcher for Wayland compositors built with [Quickshell](h
 
 ## Features
 
-- **Frecency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))
+- **Frequency-based ranking** - Results sorted by frequency + recency (inspired by [zoxide](https://github.com/ajeetdsouza/zoxide))
 - **Learned search affinity** - System learns your search shortcuts (type "q" to find QuickLinks if that's how you found it before)
 - **Pattern-matched plugins** - Plugins can auto-trigger on patterns (e.g., math expressions, URLs) without explicit prefixes
 - **Fuzzy matching** - Fast, typo-tolerant search powered by [fuzzysort](https://github.com/farzher/fuzzysort), includes desktop entry keywords (e.g., "whatsapp" finds ZapZap)
