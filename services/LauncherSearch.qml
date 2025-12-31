@@ -73,7 +73,7 @@ Singleton {
     }
 
     function findMatchingHint(query) {
-        const hints = Config.options.search.actionBarHints ?? [];
+        const hints = Config.actionBarHints ?? [];
         for (const hint of hints) {
             if (query === hint.prefix) {
                 return hint;
@@ -83,7 +83,7 @@ Singleton {
     }
 
     function getConfiguredPrefixes() {
-        const hints = Config.options.search.actionBarHints ?? [];
+        const hints = Config.actionBarHints ?? [];
         return hints.map(h => h.prefix);
     }
 

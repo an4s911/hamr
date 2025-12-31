@@ -13,6 +13,22 @@ Singleton {
     property int readWriteDelay: 50 // milliseconds
     property bool blockWrites: false
 
+    // Parsed actionBarHints - kept outside JsonObject to avoid JsonAdapter serialization crash on some systems
+    readonly property var actionBarHints: {
+        try {
+            return JSON.parse(options.search.actionBarHintsJson);
+        } catch (e) {
+            return [
+                { "prefix": "~", "icon": "folder", "label": "Files", "plugin": "files" },
+                { "prefix": ";", "icon": "content_paste", "label": "Clipboard", "plugin": "clipboard" },
+                { "prefix": "/", "icon": "extension", "label": "Plugins", "plugin": "action" },
+                { "prefix": "!", "icon": "terminal", "label": "Shell", "plugin": "shell" },
+                { "prefix": "=", "icon": "calculate", "label": "Math", "plugin": "calculate" },
+                { "prefix": ":", "icon": "emoji_emotions", "label": "Emoji", "plugin": "emoji" }
+            ];
+        }
+    }
+
     function setNestedValue(nestedKey, value) {
         let keys = nestedKey.split(".");
         let obj = root.options;
@@ -122,21 +138,6 @@ Singleton {
                 // Each hint has: prefix, icon, label, plugin
                 // Note: The old "prefix" object above is kept for backwards compatibility
                 property string actionBarHintsJson: '[{"prefix":"~","icon":"folder","label":"Files","plugin":"files"},{"prefix":";","icon":"content_paste","label":"Clipboard","plugin":"clipboard"},{"prefix":"/","icon":"extension","label":"Plugins","plugin":"action"},{"prefix":"!","icon":"terminal","label":"Shell","plugin":"shell"},{"prefix":"=","icon":"calculate","label":"Math","plugin":"calculate"},{"prefix":":","icon":"emoji_emotions","label":"Emoji","plugin":"emoji"}]'
-                // Parsed version for easy access in QML
-                readonly property var actionBarHints: {
-                    try {
-                        return JSON.parse(actionBarHintsJson);
-                    } catch (e) {
-                        return [
-                            { "prefix": "~", "icon": "folder", "label": "Files", "plugin": "files" },
-                            { "prefix": ";", "icon": "content_paste", "label": "Clipboard", "plugin": "clipboard" },
-                            { "prefix": "/", "icon": "extension", "label": "Plugins", "plugin": "action" },
-                            { "prefix": "!", "icon": "terminal", "label": "Shell", "plugin": "shell" },
-                            { "prefix": "=", "icon": "calculate", "label": "Math", "plugin": "calculate" },
-                            { "prefix": ":", "icon": "emoji_emotions", "label": "Emoji", "plugin": "emoji" }
-                        ];
-                    }
-                }
             }
 
             // ==================== IMAGE BROWSER ====================

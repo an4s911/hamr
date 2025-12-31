@@ -19,7 +19,6 @@ Singleton {
     property var outputs: ({})
     property var windows: []
     property var displayScales: ({})
-    property bool socketVerified: false
 
     signal windowListChanged
 
@@ -28,21 +27,10 @@ Singleton {
     }
 
     Component.onCompleted: {
-        if (socketPath && socketPath.length > 0) {
-            verifySocket();
+        if (socketPath) {
+            fetchOutputs();
+            fetchWindows();
         }
-    }
-
-    function verifySocket() {
-        Proc.runCommand("niri-socket-check", ["test", "-S", socketPath], (output, exitCode) => {
-            if (exitCode === 0) {
-                socketVerified = true;
-                fetchOutputs();
-                fetchWindows();
-            } else {
-                console.warn("NiriService: Socket not found:", socketPath);
-            }
-        });
     }
 
     function fetchWindows() {
@@ -62,7 +50,7 @@ Singleton {
         });
     }
 
-    property bool isActive: socketPath && socketPath.length > 0 && socketVerified
+    property bool isActive: socketPath && socketPath.length > 0
 
     Socket {
         id: eventStreamSocket

@@ -1026,7 +1026,7 @@ Scope {
             GlobalStates.launcherOpen = false;
             return;
         }
-        const hints = Config.options.search.actionBarHints ?? [];
+        const hints = Config.actionBarHints ?? [];
         const clipboardHint = hints.find(h => h.plugin === "clipboard");
         if (!clipboardHint) return;
 
@@ -1049,7 +1049,7 @@ Scope {
             return;
         }
         
-        const hints = Config.options.search.actionBarHints ?? [];
+        const hints = Config.actionBarHints ?? [];
         const emojiHint = hints.find(h => h.plugin === "emoji");
         if (!emojiHint) return;
 

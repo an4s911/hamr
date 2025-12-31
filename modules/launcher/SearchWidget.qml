@@ -402,7 +402,7 @@ Item {
                     } else if (inSearchMode) {
                         return [];
                     } else {
-                        const hints = Config.options.search.actionBarHints ?? [];
+                        const hints = Config.actionBarHints ?? [];
                         return hints.map(hint => ({
                             key: hint.prefix,
                             icon: hint.icon,
