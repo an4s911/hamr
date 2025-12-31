@@ -19,6 +19,7 @@ Singleton {
     property var outputs: ({})
     property var windows: []
     property var displayScales: ({})
+    property bool ready: false
 
     signal windowListChanged
 
@@ -27,6 +28,7 @@ Singleton {
     }
 
     Component.onCompleted: {
+        ready = true;
         if (socketPath) {
             fetchOutputs();
             fetchWindows();
@@ -55,7 +57,7 @@ Singleton {
     Socket {
         id: eventStreamSocket
         path: root.socketPath
-        connected: root.isActive
+        connected: root.ready && root.isActive
 
         onConnectionStateChanged: {
             if (connected) {
@@ -80,7 +82,7 @@ Singleton {
     Socket {
         id: requestSocket
         path: root.socketPath
-        connected: root.isActive
+        connected: root.ready && root.isActive
     }
 
     function fetchOutputs() {
