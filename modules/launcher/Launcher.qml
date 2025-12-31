@@ -499,8 +499,6 @@ Scope {
                             LauncherSearch.handleBrowserEscape("grid");
                         } else if (GlobalStates.imageBrowserOpen) {
                             LauncherSearch.handleBrowserEscape("image");
-                        } else if (PluginRunner.isActive()) {
-                            LauncherSearch.handlePluginEscape();
                         } else if (LauncherSearch.isInExclusiveMode()) {
                             LauncherSearch.exitExclusiveMode();
                         } else if (Persistent.states.launcher.hasUsedMinimize) {

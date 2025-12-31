@@ -15,6 +15,7 @@ Item {
     id: root
     readonly property string xdgConfigHome: Directories.config
     property string searchingText: LauncherSearch.query
+    property real lastBackspaceTime: 0
     property bool showResults: searchingText != "" || LauncherSearch.results.length > 0
     property bool showCard: PluginRunner.pluginCard !== null
     property bool showForm: PluginRunner.pluginForm !== null
@@ -81,9 +82,10 @@ Item {
 
          if (event.key === Qt.Key_Backspace) {
             if (!searchBar.searchInput.activeFocus) {
+                // Focus handling for non-focused input
                 root.focusSearchInput();
                 if (event.modifiers & Qt.ControlModifier) {
-                 let text = searchBar.searchInput.text;
+                     let text = searchBar.searchInput.text;
                      let pos = searchBar.searchInput.cursorPosition;
                      if (pos > 0) {
                          let left = text.slice(0, pos);
@@ -484,7 +486,7 @@ Item {
             }
 
              RowLayout {
-                visible: PluginRunner.pluginBusy && !root.showCard && PluginRunner.inputMode === "submit"
+                visible: PluginRunner.pluginBusy && !root.showCard && (PluginRunner.inputMode === "submit" || PluginRunner.pendingBack || PluginRunner.pendingNavigation)
                 Layout.fillWidth: true
                 Layout.margins: 20
                 spacing: 12

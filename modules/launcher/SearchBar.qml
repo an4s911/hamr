@@ -239,6 +239,8 @@ RowLayout {
                          root.exclusiveModePlaceholder !== "" ? root.exclusiveModePlaceholder : "It's hamr time!"
         implicitWidth: root.expandSearchInput ? -1 : (Appearance.sizes.searchWidth + (root.showMinimizeButton ? 0 : 23))
 
+        property real lastBackspaceTime: 0
+
         onTextChanged: searchDebounce.restart()
          
          Timer {
@@ -262,6 +264,28 @@ RowLayout {
          signal executePluginAction(int index)
 
          Keys.onPressed: event => {
+             if (event.key === Qt.Key_Backspace && searchInput.text === "" && PluginRunner.isActive()) {
+                 const now = Date.now();
+                 const timeSinceLast = now - (searchInput.lastBackspaceTime || 0);
+                 searchInput.lastBackspaceTime = now;
+                 
+                 // If double tap within 400ms
+                 if (timeSinceLast < 400) {
+                     if (PluginRunner.navigationDepth > 0) {
+                         // Optimistic UI update: pretend we went back immediately
+                         // This hides the current results while we wait for the new ones
+                         PluginRunner.pluginResults = [];
+                         PluginRunner.pluginBusy = true; // Show spinner immediately
+                         PluginRunner.goBack();
+                     } else {
+                         // Exit plugin is entirely local, so it's already fast
+                         LauncherSearch.exitPlugin();
+                     }
+                     event.accepted = true;
+                     return;
+                 }
+             }
+
              if (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
                 searchInput.cycleActionPrev();
                 event.accepted = true;
