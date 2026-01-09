@@ -621,23 +621,54 @@ For detailed setup including matugen templates, integration with DankMaterialShe
 
 ## Creating Plugins
 
+Extend Hamr with custom plugins in any language. Get started in under 5 minutes!
+
+### Quick Start
+
+**Option 1: Use the scaffolding script (recommended)**
+
+```bash
+./scripts/create-plugin.sh my-plugin
+cd ~/.config/hamr/plugins/my-plugin
+./test.sh  # Test your plugin
+```
+
+**Option 2: Use the AI helper (requires [OpenCode](https://opencode.ai))**
+
+Open Hamr, search `/create-plugin`, and describe what you want to build.
+
+**Option 3: Manual creation**
+
+See the complete guide: **[PLUGIN_QUICKSTART.md](PLUGIN_QUICKSTART.md)**
+
+### Plugin Structure
+
 Hamr loads plugins from two locations:
 
 - **Built-in plugins**: `<hamr>/plugins/` - Included with Hamr, read-only
 - **User plugins**: `~/.config/hamr/plugins/` - Your custom plugins
 
-User plugins with the same name as built-in plugins will override them.
-
 Each plugin is a **folder** containing:
 
-- `manifest.json` - Plugin metadata and configuration
-- `handler.py` (optional) - Handler script for dynamic plugins
-
-For simple actions, use `staticIndex` in the manifest - no handler needed.
+- `manifest.json` - Plugin metadata (required)
+- `handler.py` - Plugin logic (optional for dynamic plugins)
+- `test.sh` - Test script (recommended)
 
 **Language agnostic:** Plugins communicate via JSON over stdin/stdout. Use Python, Bash, Go, Rust, Node.js - any language that can read/write JSON.
 
-**Full documentation:** See [`plugins/README.md`](plugins/README.md) for the complete protocol reference, response types, indexing, daemon mode, forms, and more.
+### Documentation
+
+| Guide | Description |
+|-------|-------------|
+| **[Quick Start](PLUGIN_QUICKSTART.md)** | Create your first plugin in 5 minutes |
+| **[Full Guide](docs/plugins/index.md)** | Complete tutorial with examples |
+| **[Response Types](docs/plugins/response-types.md)** | All response types (results, card, form, etc.) |
+| **[Visual Elements](docs/plugins/visual-elements.md)** | Sliders, switches, badges, gauges |
+| **[Advanced Features](docs/plugins/advanced-features.md)** | Pattern matching, daemon mode, indexing |
+| **[API Reference](docs/plugins/api-reference.md)** | Complete schema reference |
+| **[Cheat Sheet](docs/plugins/cheatsheet.md)** | Quick reference for common patterns |
+
+**View protocol reference:** [`plugins/README.md`](plugins/README.md)
 
 ### What Plugins Can Do
 
