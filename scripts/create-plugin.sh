@@ -57,6 +57,7 @@ mkdir -p "$PLUGIN_DIR"
 print_success "Created directory: $PLUGIN_DIR"
 
 # Convert plugin name to display name (Title Case)
+# e.g., "my-plugin" -> "My Plugin"
 DISPLAY_NAME=$(echo "$PLUGIN_NAME" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
 
 # Prompt for details
@@ -75,6 +76,8 @@ if [ -z "$ICON" ]; then
 fi
 
 # Create manifest.json
+# Note: frecency "item" means individual results are tracked (recommended for most plugins)
+# Alternative: "plugin" tracks the plugin as a whole, "none" disables frecency
 cat > "$PLUGIN_DIR/manifest.json" << EOF
 {
   "name": "$DISPLAY_NAME",
@@ -229,14 +232,14 @@ Open Hamr and search for "$PLUGIN_NAME" or use the trigger (if configured).
 ## Development
 
 Test the plugin:
-\`\`\`bash
+```bash
 ./test.sh
-\`\`\`
+```
 
 Test manually:
-\`\`\`bash
+```bash
 echo '{"step": "initial"}' | ./handler.py | jq .
-\`\`\`
+```
 
 ## Documentation
 
