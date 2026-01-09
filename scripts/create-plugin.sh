@@ -232,14 +232,14 @@ Open Hamr and search for "$PLUGIN_NAME" or use the trigger (if configured).
 ## Development
 
 Test the plugin:
-```bash
+\`\`\`bash
 ./test.sh
-```
+\`\`\`
 
 Test manually:
-```bash
+\`\`\`bash
 echo '{"step": "initial"}' | ./handler.py | jq .
-```
+\`\`\`
 
 ## Documentation
 
